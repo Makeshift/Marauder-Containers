@@ -5,14 +5,6 @@
   echo '----------------------------------'
   echo
 
-find /app/bazarr/ -type f -name "*.py" | xargs sed -i '/timeout=[0-9]*/{
-h
-s//timeout=600/g
-H
-x
-s/\n/ >>> /
-w /dev/stdout
-x
-}'
+find /app/bazarr/ -type f -name "*.py" | xargs sed -E -i 's/timeout=[0-9]{1,3}/timeout=600/g'
 
 echo Done!
