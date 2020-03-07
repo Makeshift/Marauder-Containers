@@ -5,7 +5,8 @@ ENV GOPATH="/go" \
     MountPoint="/shared/merged" \
     ConfigPath="/config/.rclone.conf" \
     RemotePath="union:" \
-    UnmountCommands="-u -z"
+    UnmountCommands="-u -z" \
+    CacheFolderSuffix=""
 
 COPY rootfs/ /
 
