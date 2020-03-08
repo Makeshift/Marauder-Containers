@@ -1,5 +1,5 @@
 #!/usr/bin/with-contenv sh
 
-fusermount -uz /shared/merged || true
-umount /shared/merged || true
-rm -r /shared/merged
+fusermount -uz $MountPoint || true
+umount $MountPoint || true
+rm -r $MountPoint
