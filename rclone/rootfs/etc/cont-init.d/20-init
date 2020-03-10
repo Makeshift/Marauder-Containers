@@ -17,10 +17,6 @@ mkdir -p \
   $MountPoint \
   /config/ 
 
-# Set permissions
-chown -R 65534:65534 $MountPoint
-chmod -R 777 $MountPoint
-
 # Overwrite base rclone conf with env vars
 (envsubst < /rclone.conf) > /config/.rclone.conf
 # Write some config files
