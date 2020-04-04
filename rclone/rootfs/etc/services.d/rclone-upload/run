@@ -1,0 +1,40 @@
+#!/usr/bin/with-contenv sh
+PREFIX=Media/
+SOURCE=/shared/seperate/upload/$PREFIX
+DEST=uploadgdrive:/$PREFIX
+CONF_FILE=/config/.rclone.conf
+RCLONE_HOST="127.0.0.1"
+RCLONE_PORT="5572"
+
+while true; do 
+    echo "Starting upload..."
+    # Get list of uploads for later refreshing (Using json, because I need a list of items without dirs)
+    UPLOAD_LIST=$(rclone --config $CONF_FILE lsjson --max-depth=999 $SOURCE --min-age 1h | grep -v 'IsDir":true' | jq .[].Path)
+    # Do the upload
+    rclone --config $CONF_FILE move $SOURCE $DEST --delete-empty-src-dirs --no-traverse --min-age 1h $MountCommands
+    echo "Upload complete"
+
+    IFS='
+    '
+    # Mass refresh everything we uploaded so nothing has a panic attack
+    for p in $UPLOAD_LIST; do
+        p="${p%\"}"
+        p="${p#\"}"
+        p=${PREFIX}${p}
+        #echo "Telling Rclone @ ${RCLONE_HOST}:${RCLONE_PORT} to vfs/refresh ${p}"
+        if curl -fs -X POST "${RCLONE_HOST}:${RCLONE_PORT}/vfs/refresh?dir=${p}"; then
+            #echo "Rclone VFS refreshed successfully: ${p}"
+        else 
+            echo "Failed to VFS refresh, may not be visible to client: ${p}"
+        fi
+
+        #echo "Telling Rclone @ ${HOST}:${PORT} to cache/expire ${p}"
+        if curl -fs -X POST "${HOST}:${PORT}/cache/expire?remote=${p}"; then
+            #echo "Rclone cache refreshed successfully: ${p}"
+        else 
+            echo "Failed to cache refresh, may not be visible to client: ${p}"
+        fi
+    
+    done
+    sleep 10m
+done
