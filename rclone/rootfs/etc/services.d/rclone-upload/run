@@ -24,6 +24,7 @@ while true; do
         #echo "Telling Rclone @ ${RCLONE_HOST}:${RCLONE_PORT} to vfs/refresh ${p}"
         if curl -fs -X POST "${RCLONE_HOST}:${RCLONE_PORT}/vfs/refresh?dir=${p}"; then
             #echo "Rclone VFS refreshed successfully: ${p}"
+            true
         else 
             echo "Failed to VFS refresh, may not be visible to client: ${p}"
         fi
@@ -31,6 +32,7 @@ while true; do
         #echo "Telling Rclone @ ${HOST}:${PORT} to cache/expire ${p}"
         if curl -fs -X POST "${HOST}:${PORT}/cache/expire?remote=${p}"; then
             #echo "Rclone cache refreshed successfully: ${p}"
+            true
         else 
             echo "Failed to cache refresh, may not be visible to client: ${p}"
         fi
