@@ -11,7 +11,7 @@ ENV GOPATH="/go" \
 COPY rootfs/ /
 
 RUN apk --no-cache upgrade && \
-    apk --no-cache add gettext libc6-compat curl go git alpine-sdk ca-certificates fuse fuse-dev findutils jq && \
+    apk --no-cache add gettext libc6-compat curl go git alpine-sdk ca-certificates fuse fuse-dev findutils moreutils && \
     echo "Installing S6 Overlay" && \
     curl -o /tmp/s6-overlay.tar.gz -L \
     "https://github.com/just-containers/s6-overlay/releases/download/v1.22.1.0/s6-overlay-amd64.tar.gz" && \
