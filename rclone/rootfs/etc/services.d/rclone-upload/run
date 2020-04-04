@@ -1,6 +1,6 @@
 #!/usr/bin/with-contenv sh
 PREFIX=Media/
-SOURCE=/shared/seperate/upload/$PREFIX
+SOURCE=/shared/separate/upload/$PREFIX
 DEST=uploadgdrive:/$PREFIX
 CONF_FILE=/config/.rclone.conf
 RCLONE_HOST="127.0.0.1"
