@@ -5,38 +5,41 @@ DEST=uploadgdrive:/$PREFIX
 CONF_FILE=/config/.rclone.conf
 RCLONE_HOST="127.0.0.1"
 RCLONE_PORT="5572"
+RCLONE_ARGS="--fast-list -v --checkers 12 --buffer-size 16M --transfers 2 --use-mmap --low-level-retries 3 --multi-thread-cutoff 25M --multi-thread-streams 8 --no-update-modtime"
 
 while true; do 
-    echo "Starting upload..."
-    # Get list of uploads for later refreshing (Using json, because I need a list of items without dirs)
-    UPLOAD_LIST=$(rclone --config $CONF_FILE lsjson --max-depth=999 $SOURCE --min-age 1h | grep -v 'IsDir":true' | jq .[].Path)
-    # Do the upload
-    rclone --config $CONF_FILE move $SOURCE $DEST --delete-empty-src-dirs --no-traverse --min-age 1h $MountCommands
-    echo "Upload complete"
+    if [ -d "$SOURCE" ]; then
+        echo "Starting upload..."
+        # Get list of uploads for later refreshing (Using json, because I need a list of items without dirs)
+        UPLOAD_LIST=$(rclone --config $CONF_FILE lsjson --max-depth=999 $SOURCE --min-age 1h | grep -v 'IsDir":true' | jq .[].Path)
+        # Do the upload
+        rclone --config $CONF_FILE move $SOURCE $DEST --delete-empty-src-dirs --no-traverse --min-age 1h $RCLONE_ARGS
+        echo "Upload complete"
 
-    IFS='
-    '
-    # Mass refresh everything we uploaded so nothing has a panic attack
-    for p in $UPLOAD_LIST; do
-        p="${p%\"}"
-        p="${p#\"}"
-        p=${PREFIX}${p}
-        #echo "Telling Rclone @ ${RCLONE_HOST}:${RCLONE_PORT} to vfs/refresh ${p}"
-        if curl -fs -X POST "${RCLONE_HOST}:${RCLONE_PORT}/vfs/refresh?dir=${p}"; then
-            #echo "Rclone VFS refreshed successfully: ${p}"
-            true
-        else 
-            echo "Failed to VFS refresh, may not be visible to client: ${p}"
-        fi
+        IFS='
+        '
+        # Mass refresh everything we uploaded so nothing has a panic attack
+        for p in $UPLOAD_LIST; do
+            p="${p%\"}"
+            p="${p#\"}"
+            p=${PREFIX}${p}
+            #echo "Telling Rclone @ ${RCLONE_HOST}:${RCLONE_PORT} to vfs/refresh ${p}"
+            if curl -fs -X POST "${RCLONE_HOST}:${RCLONE_PORT}/vfs/refresh?dir=${p}"; then
+                #echo "Rclone VFS refreshed successfully: ${p}"
+                true
+            else 
+                echo "Failed to VFS refresh, may not be visible to client: ${p}"
+            fi
 
-        #echo "Telling Rclone @ ${HOST}:${PORT} to cache/expire ${p}"
-        if curl -fs -X POST "${HOST}:${PORT}/cache/expire?remote=${p}"; then
-            #echo "Rclone cache refreshed successfully: ${p}"
-            true
-        else 
-            echo "Failed to cache refresh, may not be visible to client: ${p}"
-        fi
-    
-    done
+            #echo "Telling Rclone @ ${HOST}:${PORT} to cache/expire ${p}"
+            if curl -fs -X POST "${HOST}:${PORT}/cache/expire?remote=${p}"; then
+                #echo "Rclone cache refreshed successfully: ${p}"
+                true
+            else 
+                echo "Failed to cache refresh, may not be visible to client: ${p}"
+            fi
+        
+        done
+    fi
     sleep 10m
 done

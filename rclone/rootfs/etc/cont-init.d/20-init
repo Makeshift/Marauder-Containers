@@ -15,7 +15,8 @@ fi
 #create folders
 mkdir -p \
   $MountPoint \
-  /config/ 
+  /config/ \
+  /shared/seperate/upload
 
 # Overwrite base rclone conf with env vars
 (envsubst < /rclone.conf) > /config/.rclone.conf
