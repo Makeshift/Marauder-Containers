@@ -16,7 +16,7 @@ fi
 mkdir -p \
   $MountPoint \
   /config/ \
-  /shared/seperate/upload
+  /shared/separate/upload
 
 # Overwrite base rclone conf with env vars
 (envsubst < /rclone.conf) > /config/.rclone.conf
