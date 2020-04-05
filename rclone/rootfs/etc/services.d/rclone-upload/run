@@ -1,6 +1,6 @@
 #!/usr/bin/with-contenv sh
 PREFIX=Media/
-SOURCE=/shared/separate/upload/$PREFIX
+SOURCE=/shared/separate/upload_mount/upload/$PREFIX
 MOUNT_LOCATION=/shared/merged/
 DEST=uploadgdrive:/$PREFIX
 CONF_FILE=/config/.rclone.conf
@@ -27,8 +27,8 @@ while true; do
             printf "%s" "$UPLOAD_LIST" > "$TMP_FILE"
             # Copy everything to the mount first to ensure that it's all still available while we're uploading
             rclone --config "$CONF_FILE" copy --files-from "$TMP_FILE" "$SOURCE" "$DEST" --no-traverse $RCLONE_ARGS
-            # Chill for 30s to make sure Gdrive is consistent
-            sleep 30s
+            # Chill for 10s to make sure Gdrive is consistent
+            sleep 10s
             # Do the 'move', which in theory will just delete the files on the local filesystem
             rclone --config "$CONF_FILE" move --files-from "$TMP_FILE" "$SOURCE" "$DEST" --delete-empty-src-dirs --no-traverse $RCLONE_ARGS
             echo "$LOG Upload complete"
@@ -64,7 +64,7 @@ while true; do
             #  but do it in the background so we don't slow down the script a bunch
             for p in $DIR_LIST; do
                 echo "$DEBUG Force cache: $p"
-                ls "${MOUNT_LOCATION}${PREFIX}${p}" &
+                ls "${MOUNT_LOCATION}${PREFIX}${p}" >/dev/null &
             done
         else
             echo "$LOG Nothing to upload in $SOURCE"
