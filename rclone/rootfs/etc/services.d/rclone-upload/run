@@ -1,6 +1,7 @@
 #!/usr/bin/with-contenv sh
 PREFIX=Media/
 SOURCE=/shared/separate/upload/$PREFIX
+MOUNT_LOCATION=/shared/merged/
 DEST=uploadgdrive:/$PREFIX
 CONF_FILE=/config/.rclone.conf
 RCLONE_HOST="127.0.0.1"
@@ -9,13 +10,16 @@ RCLONE_ARGS="--fast-list -v --checkers 12 --buffer-size 16M --transfers 2 --use-
 TMP_FILE=/tmp/rclone.uploads
 
 LOG="[services.d] [rclone-upload]-$(s6-basename ${0}):"
+DEBUG="${LOG} [DEBUG]:"
 
 echo "$LOG Starting upload service"
 while true; do 
     echo "$LOG Checking for uploads..."
     if [ -d "$SOURCE" ]; then
-        # Get a static list of uploads (Using json, because I need a list of items without dirs)
+        # Get a static list of uploads
         UPLOAD_LIST=$(rclone --config "$CONF_FILE" lsf -R --files-only "$SOURCE" --min-age 1h)
+        # Get dirs for the VFS refresh later
+        DIR_LIST=$(rclone --config "$CONF_FILE" lsf -R --dirs-only "$SOURCE" --min-age 1h)
         # Count the bytes to check if we actually do have anything to upload
         COUNT=$(printf "%s" "$UPLOAD_LIST" | wc -c)
         if [ "$COUNT" -gt 0 ]; then
@@ -23,37 +27,44 @@ while true; do
             printf "%s" "$UPLOAD_LIST" > "$TMP_FILE"
             # Copy everything to the mount first to ensure that it's all still available while we're uploading
             rclone --config "$CONF_FILE" copy --files-from "$TMP_FILE" "$SOURCE" "$DEST" --no-traverse $RCLONE_ARGS
+            # Chill for 30s to make sure Gdrive is consistent
+            sleep 30s
             # Do the 'move', which in theory will just delete the files on the local filesystem
             rclone --config "$CONF_FILE" move --files-from "$TMP_FILE" "$SOURCE" "$DEST" --delete-empty-src-dirs --no-traverse $RCLONE_ARGS
             echo "$LOG Upload complete"
             # Clean up after ourselves
             rm $TMP_FILE
-
             # Mass refresh everything we uploaded so nothing has a panic attack
             IFS='
             '
-            for p in $UPLOAD_LIST; do
+            for p in $DIR_LIST; do
                 # Remove quotes
                 p="${p%\"}"
                 p="${p#\"}"
                 # Add media folder prefix
                 p=${PREFIX}${p}
-                #echo "$LOG Telling Rclone @ ${RCLONE_HOST}:${RCLONE_PORT} to vfs/refresh ${p}"
+                #echo "$DEBUG Telling Rclone @ ${RCLONE_HOST}:${RCLONE_PORT} to vfs/refresh ${p}"
                 if curl -fs -X POST "${RCLONE_HOST}:${RCLONE_PORT}/vfs/refresh?dir=${p}"; then
-                    #echo "$LOG Rclone VFS refreshed successfully: ${p}"
+                    #echo "$DEBUG Rclone VFS refreshed successfully: ${p}"
                     true
                 else 
                     echo "$LOG Failed to VFS refresh, may not be visible to client: ${p}"
                 fi
 
-                #echo "$LOG Telling Rclone @ ${HOST}:${PORT} to cache/expire ${p}"
+                #echo "$DEBUG Telling Rclone @ ${HOST}:${PORT} to cache/expire ${p}"
                 if curl -fs -X POST "${HOST}:${PORT}/cache/expire?remote=${p}"; then
-                    #echo "$LOG Rclone cache refreshed successfully: ${p}"
+                    #echo "$DEBUG Rclone cache refreshed successfully: ${p}"
                     true
                 else 
                     echo "$LOG Failed to cache refresh, may not be visible to client: ${p}"
                 fi
             
+            done
+            # Now, force an ls in each dir to update the caches again
+            #  but do it in the background so we don't slow down the script a bunch
+            for p in $DIR_LIST; do
+                echo "$DEBUG Force cache: $p"
+                ls "${MOUNT_LOCATION}${PREFIX}${p}" &
             done
         else
             echo "$LOG Nothing to upload in $SOURCE"
