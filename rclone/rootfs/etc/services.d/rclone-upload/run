@@ -1,6 +1,6 @@
 #!/usr/bin/with-contenv sh
 PREFIX=Media/
-SOURCE=/shared/separate/upload_mount/upload/$PREFIX
+SOURCE=/shared/separate/$PREFIX
 MOUNT_LOCATION=/shared/merged/
 DEST=uploadgdrive:/$PREFIX
 CONF_FILE=/config/.rclone.conf
@@ -21,8 +21,13 @@ while true; do
         # Get dirs for the VFS refresh later
         DIR_LIST=$(rclone --config "$CONF_FILE" lsf -R --dirs-only "$SOURCE" --min-age 1h)
         # Count the bytes to check if we actually do have anything to upload
-        COUNT=$(printf "%s" "$UPLOAD_LIST" | wc -c)
-        if [ "$COUNT" -gt 0 ]; then
+        COUNT_CHARS=$(printf "%s" "$UPLOAD_LIST" | wc -c)
+        if [ "$COUNT_CHARS" -gt 0 ]; then
+            # We got stuff to upload! Get a count and tell the user so they don't think we've hung
+            #  also, this is sort of cheeky since it'll always return at least 1, but we already checked if we
+            #  have stuff to upload so it's cool
+            COUNT=$(printf "%s\n" "$UPLOAD_LIST" | wc -c)
+            echo "Found ${COUNT} files to upload! Uploading..."
             # Print the static list to file
             printf "%s" "$UPLOAD_LIST" > "$TMP_FILE"
             # Copy everything to the mount first to ensure that it's all still available while we're uploading
@@ -30,7 +35,7 @@ while true; do
             # Chill for 10s to make sure Gdrive is consistent
             sleep 10s
             # Do the 'move', which in theory will just delete the files on the local filesystem
-            rclone --config "$CONF_FILE" move --files-from "$TMP_FILE" "$SOURCE" "$DEST" --delete-empty-src-dirs --no-traverse $RCLONE_ARGS
+            rclone --config "$CONF_FILE" move --files-from "$TMP_FILE" "$SOURCE" "$DEST" --delete-empty-src-dirs --no-traverse $RCLONE_ARGS | grep Deleted
             echo "$LOG Upload complete"
             # Clean up after ourselves
             rm $TMP_FILE
