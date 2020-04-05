@@ -9,6 +9,7 @@ RCLONE_PORT="5572"
 RCLONE_ARGS="--fast-list -v --checkers 12 --buffer-size 16M --transfers 6 --use-mmap --low-level-retries 3 --multi-thread-cutoff 25M --multi-thread-streams 8 --no-update-modtime"
 TMP_FILE=/tmp/rclone.uploads
 MIN_AGE=15m
+SLEEP_SECONDS=600
 
 LOG="[services.d] [rclone-upload]-$(s6-basename ${0}):"
 DEBUG="${LOG} [DEBUG]:"
@@ -21,6 +22,7 @@ urlencode() {
 
 echo "$LOG Starting upload service"
 while true; do 
+    START_TIME=$(date +%s)
     echo "$LOG Checking for uploads..."
     if [ -d "$SOURCE" ]; then
         # Get a static list of uploads
@@ -34,7 +36,7 @@ while true; do
             #  also, this is sort of cheeky since it'll always return at least 1, but we already checked if we
             #  have stuff to upload so it's cool
             COUNT=$(printf "%s\n" "$UPLOAD_LIST" | wc -l)
-            echo "Found ${COUNT} files to upload! Uploading..."
+            echo "$LOG Found ${COUNT} files to upload! Uploading..."
             # Print the static list to file
             printf "%s" "$UPLOAD_LIST" > "$TMP_FILE"
             # Copy everything to the mount first to ensure that it's all still available while we're uploading
@@ -81,6 +83,13 @@ while true; do
     fi
     # Clear vars for the next loop
     unset DIR_LIST UPLOAD_LIST COUNT
-    # Sleep for a bit
-    sleep 10m
+    # Take away the time we spent processing from the repeat time. This ensures we're only doing one upload at once, but if there's
+    #  lots of files coming in, we'll continuously upload anything that matches the filter criteria
+    END_TIME=$(date +%s)
+    WORK_TIME=$(expr ${END_TIME} - ${START_TIME})
+    SLEEP_TIME=$(expr ${SLEEP_SECONDS} - ${WORK_TIME})
+    # Sleep for a bit if we have any sleeping to do
+    if [ "$SLEEP_TIME" -gt 0 ]; then
+        sleep ${SLEEP_TIME}s
+    fi
 done
