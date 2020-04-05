@@ -72,5 +72,8 @@ while true; do
     else
         echo "$LOG $SOURCE does not exist, skipping upload."
     fi
+    # Clear vars for the next loop
+    unset DIR_LIST UPLOAD_LIST COUNT
+    # Sleep for a bit
     sleep 10m
 done
