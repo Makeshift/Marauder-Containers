@@ -47,11 +47,11 @@ while true; do
             # Start looping through service accounts
             for ACCOUNT in $SERVICE_ACCOUNTS; do
                 # Copy everything to the mount first to ensure that it's all still available while we're uploading
-                echo $DEBUG Trying service account $ACCOUNT
+                echo $LOG Trying service account $ACCOUNT
                 RCLONE_COPY=$(rclone --config "$CONF_FILE" copy --files-from "$TMP_FILE" "$SOURCE" "$DEST" --no-traverse --drive-service-account-file "${ACCOUNT}" --drive-stop-on-upload-limit -v --buffer-size 16M --transfers 6 --use-mmap --low-level-retries 3 --multi-thread-cutoff 25M --multi-thread-streams 8 --no-update-modtime)
                 if [ "$RCLONE_COPY" -ne "0" ] ; then
                     # Rclone exited non-zero, skip to the next service account. It might try to copy the same files twice, but that only costs us an API call.
-                    echo $DEBUG Rclone exited $RCLONE_COPY using account $ACCOUNT - Switching service account
+                    echo $LOG Rclone exited $RCLONE_COPY using account $ACCOUNT - Switching service account
                     continue
                 fi
                 # Chill for 10s to make sure Gdrive is consistent
@@ -70,8 +70,8 @@ while true; do
                 # Add media folder prefix
                 p=${PREFIX}${p}
                 ESCAPED_URL=$(urlencode "${RCLONE_HOST}:${RCLONE_PORT}/vfs/refresh?dir=${p}")
-                echo "$DEBUG Telling Rclone @ ${RCLONE_HOST}:${RCLONE_PORT} to vfs/refresh ${p} with ${ESCAPED_URL}"
-                if curl -fs -X POST "${ESCAPED_URL}"; then
+                #echo "$DEBUG Telling Rclone @ ${RCLONE_HOST}:${RCLONE_PORT} to vfs/refresh ${p} with ${ESCAPED_URL}"
+                if curl -f -sS --output /dev/null -X POST "${ESCAPED_URL}"; then
                     #echo "$DEBUG Rclone VFS refreshed successfully: ${p}"
                     true
                 else 
@@ -79,8 +79,8 @@ while true; do
                 fi
 
                 ESCAPED_URL=$(urlencode "${RCLONE_HOST}:${RCLONE_PORT}/cache/expire?remote=${p}")
-                echo "$DEBUG Telling Rclone @ ${RCLONE_HOST}:${RCLONE_PORT} to cache/expire ${p} with ${ESCAPED_URL}"
-                if curl -fs -X POST "${ESCAPED_URL}"; then
+                #echo "$DEBUG Telling Rclone @ ${RCLONE_HOST}:${RCLONE_PORT} to cache/expire ${p} with ${ESCAPED_URL}"
+                if curl -f -sS --output /dev/null -X POST "${ESCAPED_URL}"; then
                     #echo "$DEBUG Rclone cache refreshed successfully: ${p}"
                     true
                 else 
