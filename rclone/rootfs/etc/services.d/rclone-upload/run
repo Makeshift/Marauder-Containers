@@ -14,11 +14,11 @@ MIN_AGE=15m
 SLEEP_SECONDS=600
 IFS='
 '
-LOG="[services.d] [rclone-upload]-$(s6-basename ${0}):"
+LOG="[services.d] [rclone-upload]-$(s6-basename "${0}"):"
 DEBUG="${LOG} [DEBUG]:"
 
 urlencode() {
-    data="$(curl -s -o /dev/null -w %{url_effective} --get --data-urlencode "$1" "")"
+    data="$(curl -s -o /dev/null -w "%{url_effective}" --get --data-urlencode "$1" "")"
     echo "${data##/?}"
     return 0
 }
@@ -48,7 +48,7 @@ while true; do
                 # Copy everything to the mount first to ensure that it's all still available while we're uploading
                 ACCOUNT=${SERVICE_ACCOUNT_PATH}${ACCOUNT}
                 echo $DEBUG Trying service account $ACCOUNT
-                if ! rclone --config "$CONF_FILE" --drive-service-account-file --drive-stop-on-upload-limit $ACCOUNT copy --files-from "$TMP_FILE" "$SOURCE" "$DEST" --no-traverse $RCLONE_ARGS; then
+                if ! rclone --config "$CONF_FILE" --drive-service-account-file "${ACCOUNT}" --drive-stop-on-upload-limit copy --files-from "$TMP_FILE" "$SOURCE" "$DEST" --no-traverse $RCLONE_ARGS; then
                     # Rclone exited non-zero, skip to the next service account. It might try to copy the same files twice, but that only costs us an API call.
                     echo $DEBUG Rclone exited $? using account $ACCOUNT - Switching service account
                     continue
