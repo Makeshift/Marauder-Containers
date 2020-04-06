@@ -6,8 +6,7 @@ DEST=uploadgdrive:/$PREFIX
 CONF_FILE=/config/.rclone.conf
 RCLONE_HOST="127.0.0.1"
 RCLONE_PORT="5572"
-RCLONE_ARGS="--fast-list -v --checkers 12 --buffer-size 16M --transfers 6 --use-mmap --low-level-retries 3 --multi-thread-cutoff 25M --multi-thread-streams 8 --no-update-modtime"
-SERVICE_ACCOUNT_PATH=/service_accounts/
+SERVICE_ACCOUNT_PATH=/service_accounts
 SERVICE_ACCOUNTS=$(find "${SERVICE_ACCOUNT_PATH}" -type f -name "*.json")
 TMP_FILE=/tmp/rclone.uploads
 MIN_AGE=15m
@@ -22,6 +21,8 @@ urlencode() {
     echo "${data##/?}"
     return 0
 }
+
+rm TMP_FILE
 
 echo "$LOG Starting upload service"
 while true; do 
@@ -46,18 +47,18 @@ while true; do
             # Start looping through service accounts
             for ACCOUNT in $SERVICE_ACCOUNTS; do
                 # Copy everything to the mount first to ensure that it's all still available while we're uploading
-                ACCOUNT=${SERVICE_ACCOUNT_PATH}${ACCOUNT}
                 echo $DEBUG Trying service account $ACCOUNT
-                if ! rclone --config "$CONF_FILE" --drive-service-account-file "${ACCOUNT}" --drive-stop-on-upload-limit copy --files-from "$TMP_FILE" "$SOURCE" "$DEST" --no-traverse $RCLONE_ARGS; then
+                RCLONE_COPY=$(rclone --config "$CONF_FILE" copy --files-from "$TMP_FILE" "$SOURCE" "$DEST" --no-traverse --drive-service-account-file "${ACCOUNT}" --drive-stop-on-upload-limit -v --buffer-size 16M --transfers 6 --use-mmap --low-level-retries 3 --multi-thread-cutoff 25M --multi-thread-streams 8 --no-update-modtime)
+                if [ "$RCLONE_COPY" -ne "0" ] ; then
                     # Rclone exited non-zero, skip to the next service account. It might try to copy the same files twice, but that only costs us an API call.
-                    echo $DEBUG Rclone exited $? using account $ACCOUNT - Switching service account
+                    echo $DEBUG Rclone exited $RCLONE_COPY using account $ACCOUNT - Switching service account
                     continue
                 fi
                 # Chill for 10s to make sure Gdrive is consistent
                 sleep 10s
                 # Do the 'move', which in theory will just delete the files on the local filesystem. We can assume it'll never hit the transfer cap because
                 #  it'll never actually do any moves.
-                rclone --config --drive-service-account-file $ACCOUNT "$CONF_FILE" move --files-from "$TMP_FILE" "$SOURCE" "$DEST" --delete-empty-src-dirs --no-traverse $RCLONE_ARGS
+                rclone --config "$CONF_FILE" "$RCLONE_ARGS" move --files-from "$TMP_FILE" "$SOURCE" "$DEST" --fast-list --checkers 12 --delete-empty-src-dirs --drive-service-account-file "${ACCOUNT}" --no-traverse
                 # If we get here, we can assume we've successfully copied and can kill the loop
                 break
             done
