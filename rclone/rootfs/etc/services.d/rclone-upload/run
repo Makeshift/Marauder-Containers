@@ -1,4 +1,5 @@
 #!/usr/bin/with-contenv sh
+set +x
 PREFIX=Media/
 SOURCE=/shared/separate/$PREFIX
 MOUNT_LOCATION=/shared/merged/
@@ -16,13 +17,7 @@ IFS='
 LOG="[services.d] [rclone-upload]-$(s6-basename "${0}"):"
 DEBUG="${LOG} [DEBUG]:"
 
-urlencode() {
-    data="$(curl -s -o /dev/null -w "%{url_effective}" --get --data-urlencode "$1" "")"
-    echo "${data##/?}"
-    return 0
-}
-
-rm TMP_FILE
+rm $TMP_FILE
 
 echo "$LOG Starting upload service"
 while true; do 
@@ -48,8 +43,9 @@ while true; do
             for ACCOUNT in $SERVICE_ACCOUNTS; do
                 # Copy everything to the mount first to ensure that it's all still available while we're uploading
                 echo $LOG Trying service account $ACCOUNT
-                RCLONE_COPY=$(rclone --config "$CONF_FILE" copy --files-from "$TMP_FILE" "$SOURCE" "$DEST" --no-traverse --drive-service-account-file "${ACCOUNT}" --drive-stop-on-upload-limit -v --buffer-size 16M --transfers 6 --use-mmap --low-level-retries 3 --multi-thread-cutoff 25M --multi-thread-streams 8 --no-update-modtime)
-                if [ "$RCLONE_COPY" -ne "0" ] ; then
+                echo $DEBUG rclone --config "$CONF_FILE" copy --files-from "$TMP_FILE" "$SOURCE" "$DEST" --no-traverse --drive-service-account-file "${ACCOUNT}" --drive-stop-on-upload-limit -v --buffer-size 16M --transfers 6 --use-mmap --low-level-retries 3 --multi-thread-cutoff 25M --multi-thread-streams 8 --no-update-modtime
+                rclone --config "$CONF_FILE" copy --files-from "$TMP_FILE" "$SOURCE" "$DEST" --no-traverse --drive-service-account-file "${ACCOUNT}" --drive-stop-on-upload-limit -v --buffer-size 16M --transfers 6 --use-mmap --low-level-retries 3 --multi-thread-cutoff 25M --multi-thread-streams 8 --no-update-modtime
+                if [ "$?" -ne "0" ] ; then
                     # Rclone exited non-zero, skip to the next service account. It might try to copy the same files twice, but that only costs us an API call.
                     echo $LOG Rclone exited $RCLONE_COPY using account $ACCOUNT - Switching service account
                     continue
@@ -58,7 +54,8 @@ while true; do
                 sleep 10s
                 # Do the 'move', which in theory will just delete the files on the local filesystem. We can assume it'll never hit the transfer cap because
                 #  it'll never actually do any moves.
-                rclone --config "$CONF_FILE" "$RCLONE_ARGS" move --files-from "$TMP_FILE" "$SOURCE" "$DEST" --fast-list --checkers 12 --delete-empty-src-dirs --drive-service-account-file "${ACCOUNT}" --no-traverse
+                echo $DEBUG rclone --config "$CONF_FILE" move --files-from "$TMP_FILE" "$SOURCE" "$DEST" --fast-list --checkers 12 --delete-empty-src-dirs --drive-service-account-file "${ACCOUNT}" --no-traverse
+                rclone --config "$CONF_FILE" move --files-from "$TMP_FILE" "$SOURCE" "$DEST" --fast-list --checkers 12 --delete-empty-src-dirs --drive-service-account-file "${ACCOUNT}" --no-traverse
                 # If we get here, we can assume we've successfully copied and can kill the loop
                 break
             done
@@ -69,18 +66,14 @@ while true; do
             for p in $DIR_LIST; do
                 # Add media folder prefix
                 p=${PREFIX}${p}
-                ESCAPED_URL=$(urlencode "${RCLONE_HOST}:${RCLONE_PORT}/vfs/refresh?dir=${p}")
-                #echo "$DEBUG Telling Rclone @ ${RCLONE_HOST}:${RCLONE_PORT} to vfs/refresh ${p} with ${ESCAPED_URL}"
-                if curl -f -sS --output /dev/null -X POST "${ESCAPED_URL}"; then
+                if curl -f -sS --output /dev/null --data-urlencode "dir=${p}" -X POST "${RCLONE_HOST}:${RCLONE_PORT}/vfs/refresh"; then
                     #echo "$DEBUG Rclone VFS refreshed successfully: ${p}"
                     true
                 else 
                     echo "$LOG Failed to VFS refresh, may not be visible to client: ${p}"
                 fi
 
-                ESCAPED_URL=$(urlencode "${RCLONE_HOST}:${RCLONE_PORT}/cache/expire?remote=${p}")
-                #echo "$DEBUG Telling Rclone @ ${RCLONE_HOST}:${RCLONE_PORT} to cache/expire ${p} with ${ESCAPED_URL}"
-                if curl -f -sS --output /dev/null -X POST "${ESCAPED_URL}"; then
+                if curl -f -sS --output /dev/null --data-urlencode "remote=${p}" -X POST "${RCLONE_HOST}:${RCLONE_PORT}/cache/expire"; then
                     #echo "$DEBUG Rclone cache refreshed successfully: ${p}"
                     true
                 else 
