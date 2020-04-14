@@ -8,8 +8,6 @@ ENV GOPATH="/go" \
     UnmountCommands="-u -z" \
     CacheFolderSuffix=""
 
-COPY rootfs/ /
-
 RUN apk --no-cache upgrade && \
     apk --no-cache add gettext libc6-compat curl go git alpine-sdk ca-certificates fuse fuse-dev findutils moreutils && \
     echo "Installing S6 Overlay" && \
@@ -21,5 +19,7 @@ RUN apk --no-cache upgrade && \
     cp /go/bin/rclone /usr/sbin/ && \
     apk del go git alpine-sdk && \
     rm -rf /usr/lib/go /go /tmp/* /var/cache/apk/* /var/lib/apk/lists/*
+
+COPY rootfs/ /
 
 ENTRYPOINT ["/init"]

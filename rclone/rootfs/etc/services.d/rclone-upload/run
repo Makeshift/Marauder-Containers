@@ -16,6 +16,7 @@ IFS='
 '
 LOG="[services.d] [rclone-upload]-$(s6-basename "${0}"):"
 DEBUG="${LOG} [DEBUG]:"
+GLOBAL_ACCOUNT_NUM=0
 
 rm $TMP_FILE
 
@@ -25,9 +26,9 @@ while true; do
     echo "$LOG Checking for uploads..."
     if [ -d "$SOURCE" ]; then
         # Get a static list of uploads
-        UPLOAD_LIST=$(rclone --config "$CONF_FILE" lsf -R --files-only "$SOURCE" --min-age $MIN_AGE)
+        UPLOAD_LIST=$(rclone --config "$CONF_FILE" lsf -R -L --files-only "$SOURCE" --min-age $MIN_AGE)
         # Get dirs for the VFS refresh later
-        DIR_LIST=$(rclone --config "$CONF_FILE" lsf -R --dirs-only "$SOURCE" --min-age $MIN_AGE)
+        DIR_LIST=$(rclone --config "$CONF_FILE" lsf -R -L --dirs-only "$SOURCE" --min-age $MIN_AGE)
         # Count the bytes to check if we actually do have anything to upload
         COUNT_CHARS=$(printf "%s" "$UPLOAD_LIST" | wc -c)
         if [ "$COUNT_CHARS" -gt 0 ]; then
@@ -40,11 +41,17 @@ while true; do
             printf "%s" "$UPLOAD_LIST" > "$TMP_FILE"
             
             # Start looping through service accounts
+            CURRENT_ACCONT_NUM=0
             for ACCOUNT in $SERVICE_ACCOUNTS; do
+                # If we've burned through a couple of service accounts before, we can skip them
+                CURRENT_ACCOUNT_NUM=$((CURRENT_ACCONT_NUM+1))
+                if [ "$CURRENT_ACCOUNT_NUM" -lt "$GLOBAL_ACCOUNT_NUM" ]; then
+                    continue
+                fi
                 # Copy everything to the mount first to ensure that it's all still available while we're uploading
                 echo $LOG Trying service account $ACCOUNT
-                echo $DEBUG rclone --config "$CONF_FILE" copy --files-from "$TMP_FILE" "$SOURCE" "$DEST" --no-traverse --drive-service-account-file "${ACCOUNT}" --drive-stop-on-upload-limit -v --buffer-size 16M --transfers 6 --use-mmap --low-level-retries 3 --multi-thread-cutoff 25M --multi-thread-streams 8 --no-update-modtime
-                rclone --config "$CONF_FILE" copy --files-from "$TMP_FILE" "$SOURCE" "$DEST" --no-traverse --drive-service-account-file "${ACCOUNT}" --drive-stop-on-upload-limit -v --buffer-size 16M --transfers 6 --use-mmap --low-level-retries 3 --multi-thread-cutoff 25M --multi-thread-streams 8 --no-update-modtime
+                echo $DEBUG rclone --config "$CONF_FILE" copy -L --files-from "$TMP_FILE" "$SOURCE" "$DEST" --drive-shared-with-me --no-traverse --drive-service-account-file "${ACCOUNT}" --drive-stop-on-upload-limit -v --buffer-size 16M --transfers 6 --use-mmap --low-level-retries 1 --multi-thread-cutoff 25M --multi-thread-streams 8 --no-update-modtime
+                rclone --config "$CONF_FILE" copy -L --files-from "$TMP_FILE" "$SOURCE" "$DEST" --drive-shared-with-me --no-traverse --drive-service-account-file "${ACCOUNT}" --drive-stop-on-upload-limit -v --buffer-size 16M --transfers 6 --use-mmap --low-level-retries 1 --multi-thread-cutoff 25M --multi-thread-streams 8 --no-update-modtime
                 if [ "$?" -ne "0" ] ; then
                     # Rclone exited non-zero, skip to the next service account. It might try to copy the same files twice, but that only costs us an API call.
                     echo $LOG Rclone exited $RCLONE_COPY using account $ACCOUNT - Switching service account
@@ -54,9 +61,10 @@ while true; do
                 sleep 10s
                 # Do the 'move', which in theory will just delete the files on the local filesystem. We can assume it'll never hit the transfer cap because
                 #  it'll never actually do any moves.
-                echo $DEBUG rclone --config "$CONF_FILE" move --files-from "$TMP_FILE" "$SOURCE" "$DEST" --fast-list --checkers 12 --delete-empty-src-dirs --drive-service-account-file "${ACCOUNT}" --no-traverse
-                rclone --config "$CONF_FILE" move --files-from "$TMP_FILE" "$SOURCE" "$DEST" --fast-list --checkers 12 --delete-empty-src-dirs --drive-service-account-file "${ACCOUNT}" --no-traverse
+                echo $DEBUG rclone --config "$CONF_FILE" move -L --files-from "$TMP_FILE" "$SOURCE" "$DEST" --drive-shared-with-me --fast-list --checkers 12 --delete-empty-src-dirs --drive-service-account-file "${ACCOUNT}" --no-traverse
+                rclone --config "$CONF_FILE" move -L --files-from "$TMP_FILE" "$SOURCE" "$DEST" --drive-shared-with-me --fast-list --checkers 12 --delete-empty-src-dirs --drive-service-account-file "${ACCOUNT}" --no-traverse
                 # If we get here, we can assume we've successfully copied and can kill the loop
+                GLOBAL_ACCOUNT_NUM=$CURRENT_ACCOUNT_NUM
                 break
             done
             echo "$LOG Upload complete"
@@ -66,21 +74,8 @@ while true; do
             for p in $DIR_LIST; do
                 # Add media folder prefix
                 p=${PREFIX}${p}
-                if curl -f -sS --output /dev/null --data-urlencode "dir=${p}" -X POST "${RCLONE_HOST}:${RCLONE_PORT}/vfs/refresh"; then
-                    #echo "$DEBUG Rclone VFS refreshed successfully: ${p}"
-                    true
-                else 
-                    echo "$LOG Failed to VFS refresh, may not be visible to client: ${p}"
-                fi
-
-                if curl -f -sS --output /dev/null --data-urlencode "remote=${p}" -X POST "${RCLONE_HOST}:${RCLONE_PORT}/cache/expire"; then
-                    #echo "$DEBUG Rclone cache refreshed successfully: ${p}"
-                    true
-                else 
-                    echo "$LOG Failed to cache refresh, may not be visible to client: ${p}"
-                fi
-                # Now, force an ls in each dir to update the caches again
-                #  but do it in the background so we don't slow down the script a bunch
+                curl -fvsS  --output /dev/null --data-urlencode "dir=${p}" -X POST "${RCLONE_HOST}:${RCLONE_PORT}/vfs/refresh" 2>&1
+                curl -fvsS --output /dev/null --data-urlencode "remote=${p}" -X POST "${RCLONE_HOST}:${RCLONE_PORT}/cache/expire" 2>&1
                 ls "${MOUNT_LOCATION}${p}" >/dev/null &
             done
         else

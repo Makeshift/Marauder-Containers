@@ -19,5 +19,3 @@ mkdir -p \
 
 # Overwrite base rclone conf with env vars
 (envsubst < /rclone.conf) > /config/.rclone.conf
-# Write some config files
-echo $rclone_service_credential_file > /credentials.json
