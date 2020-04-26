@@ -1,5 +1,5 @@
-#!/usr/bin/with-contenv sh
-
+#!/usr/bin/with-contenv bash
+set -a
 source /etc/colors.sh
 
 PREFFIX="[cont-init.d] $(s6-basename ${0}):"
@@ -17,5 +17,16 @@ mkdir -p \
   $MountPoint \
   /config/ 
 
-# Overwrite base rclone conf with env vars
-(envsubst < /rclone.conf) > /config/.rclone.conf
+# Generate multi-drive conf
+read -a rclone_team_drive_ids_arr <<< $rclone_team_drive_ids
+count=0
+for rclone_team_drive_id in "${rclone_team_drive_ids_arr[@]}"; do
+    (envsubst < /rclone_conf/rclone_multi_template) >> /config/.rclone.conf
+    multi_names="${multi_names} gdrive_mount_crypt_${count}:/:nc"
+    count=$((count+1))
+done
+
+# Create the union
+## Remove leading space
+multi_names="${multi_names#"${multi_names%%[![:space:]]*}"}"
+(envsubst < /rclone_conf/rclone_union) >> /config/.rclone.conf

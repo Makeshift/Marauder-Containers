@@ -1,15 +1,18 @@
-#!/usr/bin/with-contenv sh
+#!/usr/bin/with-contenv bash
 set +x
+set -o pipefail
 PREFIX=Media/
 SOURCE=/shared/separate/$PREFIX
 MOUNT_LOCATION=/shared/merged/
-DEST=uploadgdrive:/$PREFIX
+MOUNT_NAME_PREFIX=gdrive_upload_crypt_
 CONF_FILE=/config/.rclone.conf
 RCLONE_HOST="127.0.0.1"
-RCLONE_PORT="5572"
+RCLONE_PORT="5572" # I should probably set this from an env var
 SERVICE_ACCOUNT_PATH=/service_accounts
 SERVICE_ACCOUNTS=$(find "${SERVICE_ACCOUNT_PATH}" -type f -name "*.json")
+SERVICE_ACCOUNT_COUNT=$(printf "%s" "${SERVICE_ACCOUNTS}" | wc -l)
 TMP_FILE=/tmp/rclone.uploads
+TMP_LOG=/tmp/rclone.copylog
 MIN_AGE=15m
 SLEEP_SECONDS=600
 IFS='
@@ -17,8 +20,11 @@ IFS='
 LOG="[services.d] [rclone-upload]-$(s6-basename "${0}"):"
 DEBUG="${LOG} [DEBUG]:"
 GLOBAL_ACCOUNT_NUM=0
+TEAM_DRIVES_COUNT=$(printf "%s\n" ${rclone_team_drive_ids} | wc -l)
+CURRENT_TEAM_DRIVE=0
 
-rm $TMP_FILE
+
+rm $TMP_FILE > /dev/null 2>&1
 
 echo "$LOG Starting upload service"
 while true; do 
@@ -43,19 +49,39 @@ while true; do
             # Start looping through service accounts
             CURRENT_ACCONT_NUM=0
             for ACCOUNT in $SERVICE_ACCOUNTS; do
+                # Work out the current destination based on our team drive
+                DEST=${MOUNT_NAME_PREFIX}${CURRENT_TEAM_DRIVE}:/$PREFIX
                 # If we've burned through a couple of service accounts before, we can skip them
                 CURRENT_ACCOUNT_NUM=$((CURRENT_ACCONT_NUM+1))
                 if [ "$CURRENT_ACCOUNT_NUM" -lt "$GLOBAL_ACCOUNT_NUM" ]; then
+                    # If we've burned through all our service accounts in this session, reset the global counter to 0
+                    #  This means we'll exit the loop and not actually upload anything this time, but that just means we'll
+                    #  tell rclone to clear caches unneccessarily and wait 10 minutes before uploading - oh well.
+                    if [ "$SERVICE_ACCOUNT_COUNT" -eq "$GLOBAL_ACCOUNT_NUM" ]; then
+                        GLOBAL_ACCOUNT_NUM=0
+                    fi
                     continue
                 fi
                 # Copy everything to the mount first to ensure that it's all still available while we're uploading
                 echo $LOG Trying service account $ACCOUNT
                 echo $DEBUG rclone --config "$CONF_FILE" copy -L --files-from "$TMP_FILE" "$SOURCE" "$DEST" --drive-shared-with-me --no-traverse --drive-service-account-file "${ACCOUNT}" --drive-stop-on-upload-limit -v --buffer-size 16M --transfers 6 --use-mmap --low-level-retries 1 --multi-thread-cutoff 25M --multi-thread-streams 8 --no-update-modtime
-                rclone --config "$CONF_FILE" copy -L --files-from "$TMP_FILE" "$SOURCE" "$DEST" --drive-shared-with-me --no-traverse --drive-service-account-file "${ACCOUNT}" --drive-stop-on-upload-limit -v --buffer-size 16M --transfers 6 --use-mmap --low-level-retries 1 --multi-thread-cutoff 25M --multi-thread-streams 8 --no-update-modtime
-                if [ "$?" -ne "0" ] ; then
-                    # Rclone exited non-zero, skip to the next service account. It might try to copy the same files twice, but that only costs us an API call.
-                    echo $LOG Rclone exited $RCLONE_COPY using account $ACCOUNT - Switching service account
+                rclone --config "$CONF_FILE" copy -L --files-from "$TMP_FILE" "$SOURCE" "$DEST" --drive-shared-with-me --no-traverse --drive-service-account-file "${ACCOUNT}" --drive-stop-on-upload-limit -v --buffer-size 16M --transfers 6 --use-mmap --low-level-retries 1 --multi-thread-cutoff 25M --multi-thread-streams 8 --no-update-modtime 2>&1 | tee $TMP_LOG
+                RCLONE_EXIT_CODE=$?
+                if [ "${RCLONE_EXIT_CODE}" -ne "0" ] ; then
+                    # Skip to the next service account. It might try to copy the same files twice, but that only costs us an API call.
+                    echo $LOG Rclone exited ${RCLONE_EXIT_CODE} using account $ACCOUNT - Switching service account
+
+                    # Rclone exited non-zero, check which error it is (We're going to switch service accounts anyway because it means less coding ;))
+                    # TODO: Make it look out for the service account error properly
+                    if grep "teamDriveFileLimitExceeded" $TMP_LOG > /dev/null; then
+                        echo $LOG Rclone claims teamDriveFileLimitExceeded, switching team drive if possible
+                        CURRENT_TEAM_DRIVE=$((CURRENT_TEAM_DRIVE+1))
+                        if [ "$CURRENT_TEAM_DRIVE" -gt "$TEAM_DRIVES_COUNT" ]; then
+                            CURRENT_TEAM_DRIVE=0
+                        fi
+                    fi
                     continue
+                    
                 fi
                 # Chill for 10s to make sure Gdrive is consistent
                 sleep 10s
