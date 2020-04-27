@@ -8,6 +8,7 @@ MOUNT_NAME_PREFIX=gdrive_upload_crypt_
 CONF_FILE=/config/.rclone.conf
 RCLONE_HOST="127.0.0.1"
 RCLONE_PORT="5572" # I should probably set this from an env var
+COUNT_LIMIT=1000
 SERVICE_ACCOUNT_PATH=/service_accounts
 SERVICE_ACCOUNTS=$(find "${SERVICE_ACCOUNT_PATH}" -type f -name "*.json")
 SERVICE_ACCOUNT_COUNT=$(printf "%s" "${SERVICE_ACCOUNTS}" | wc -l)
@@ -29,12 +30,11 @@ rm $TMP_FILE > /dev/null 2>&1
 echo "$LOG Starting upload service"
 while true; do 
     START_TIME=$(date +%s)
+    SKIP_WAIT=0
     echo "$LOG Checking for uploads..."
     if [ -d "$SOURCE" ]; then
         # Get a static list of uploads
         UPLOAD_LIST=$(rclone --config "$CONF_FILE" lsf -R -L --files-only "$SOURCE" --min-age $MIN_AGE)
-        # Get dirs for the VFS refresh later
-        DIR_LIST=$(rclone --config "$CONF_FILE" lsf -R -L --dirs-only "$SOURCE" --min-age $MIN_AGE)
         # Count the bytes to check if we actually do have anything to upload
         COUNT_CHARS=$(printf "%s" "$UPLOAD_LIST" | wc -c)
         if [ "$COUNT_CHARS" -gt 0 ]; then
@@ -42,10 +42,27 @@ while true; do
             #  also, this is sort of cheeky since it'll always return at least 1, but we already checked if we
             #  have stuff to upload so it's cool
             COUNT=$(printf "%s\n" "$UPLOAD_LIST" | wc -l)
-            echo "$LOG Found ${COUNT} files to upload! Uploading..."
+            echo "$LOG Found ${COUNT} files to upload!"
+            # Because we might be switching team drives mid-upload, we don't want to upload the same files to multiple team drives, so we limit the upload to
+            #  to a certain number of files to naievely avoid mass-duplication
+            if [ "$COUNT" -gt "$COUNT_LIMIT" ]; then
+                UPLOAD_LIST=$(trap "" PIPE;echo "$UPLOAD_LIST" | head -n $COUNT_LIMIT)
+                echo "$LOG $COUNT is larger than our limit of $COUNT_LIMIT - Truncating the list to $COUNT_LIMIT to avoid duplication if we switch drives. We'll skip the wait to automatically continue processing."
+                SKIP_WAIT=1
+            fi
             # Print the static list to file
             printf "%s" "$UPLOAD_LIST" > "$TMP_FILE"
-            
+            # Create a directory list for VFS refreshing
+            # OLDIFS=$IFS
+            # IFS=$'\n'
+            # for UPLOAD in "${UPLOAD_LIST}"; do
+            #     echo $UPLOAD
+            #     DIR_LIST=${DIR_LIST}\n$(dirname $UPLOAD)
+            # done
+            # IFS=$OLDIFS
+            # echo $DIR_LIST
+            # DIR_LIST=$(echo "$DIR_LIST" | sort | uniq -d)
+            # echo $DIR_LIST
             # Start looping through service accounts
             CURRENT_ACCONT_NUM=0
             for ACCOUNT in $SERVICE_ACCOUNTS; do
@@ -68,9 +85,10 @@ while true; do
                 rclone --config "$CONF_FILE" copy -L --files-from "$TMP_FILE" "$SOURCE" "$DEST" --drive-shared-with-me --no-traverse --drive-service-account-file "${ACCOUNT}" --drive-stop-on-upload-limit -v --buffer-size 16M --transfers 6 --use-mmap --low-level-retries 1 --multi-thread-cutoff 25M --multi-thread-streams 8 --no-update-modtime 2>&1 | tee $TMP_LOG
                 RCLONE_EXIT_CODE=$?
                 if [ "${RCLONE_EXIT_CODE}" -ne "0" ] ; then
-                    # Skip to the next service account. It might try to copy the same files twice, but that only costs us an API call.
-                    echo $LOG Rclone exited ${RCLONE_EXIT_CODE} using account $ACCOUNT - Switching service account
-
+                    if grep "userRateLimitExceeded" $TMP_LOG > /dev/null; then
+                        # Skip to the next service account. It might try to copy the same files twice, but that only costs us an API call.
+                        echo $LOG Rclone exited ${RCLONE_EXIT_CODE} with error userRateLimitExceeded using account $ACCOUNT - Switching service account
+                    fi
                     # Rclone exited non-zero, check which error it is (We're going to switch service accounts anyway because it means less coding ;))
                     # TODO: Make it look out for the service account error properly
                     if grep "teamDriveFileLimitExceeded" $TMP_LOG > /dev/null; then
@@ -80,6 +98,7 @@ while true; do
                             CURRENT_TEAM_DRIVE=0
                         fi
                     fi
+                    # We switch service account anyway because it's just easier :P
                     continue
                     
                 fi
@@ -97,28 +116,29 @@ while true; do
             # Clean up after ourselves
             rm $TMP_FILE
             # Mass refresh everything we uploaded so nothing has a panic attack
-            for p in $DIR_LIST; do
-                # Add media folder prefix
-                p=${PREFIX}${p}
-                curl -fvsS  --output /dev/null --data-urlencode "dir=${p}" -X POST "${RCLONE_HOST}:${RCLONE_PORT}/vfs/refresh" 2>&1
-                curl -fvsS --output /dev/null --data-urlencode "remote=${p}" -X POST "${RCLONE_HOST}:${RCLONE_PORT}/cache/expire" 2>&1
-                ls "${MOUNT_LOCATION}${p}" >/dev/null &
-            done
+            # for p in $DIR_LIST; do
+            #     # Add media folder prefix
+            #     p=${PREFIX}${p}
+            #     curl -fs --output /dev/null --data-urlencode "dir=${p}" -X POST "${RCLONE_HOST}:${RCLONE_PORT}/vfs/refresh" > /dev/null &
+            #     curl -fs --output /dev/null --data-urlencode "remote=${p}" -X POST "${RCLONE_HOST}:${RCLONE_PORT}/cache/expire" > /dev/null &
+            #     ls "${MOUNT_LOCATION}${p}" >/dev/null &
+            # done
         else
             echo "$LOG Nothing to upload in $SOURCE"
         fi
     else
         echo "$LOG $SOURCE does not exist, skipping upload."
     fi
-    # Clear vars for the next loop
-    unset DIR_LIST UPLOAD_LIST COUNT
     # Take away the time we spent processing from the repeat time. This ensures we're only doing one upload at once, but if there's
     #  lots of files coming in, we'll continuously upload anything that matches the filter criteria
     END_TIME=$(date +%s)
     WORK_TIME=$(expr ${END_TIME} - ${START_TIME})
     SLEEP_TIME=$(expr ${SLEEP_SECONDS} - ${WORK_TIME})
     # Sleep for a bit if we have any sleeping to do
-    if [ "$SLEEP_TIME" -gt 0 ]; then
+    if [ "$SLEEP_TIME" -gt 0 ] && [ "$SKIP_WAIT" -eq 0 ]; then
+        echo Sleeping for ${SLEEP_TIME}s until next upload run.
         sleep ${SLEEP_TIME}s
     fi
+    # Clear vars for the next loop
+    unset UPLOAD_LIST COUNT SKIP_WAIT
 done
