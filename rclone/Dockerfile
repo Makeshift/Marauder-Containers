@@ -8,18 +8,25 @@ ENV GOPATH="/go" \
     UnmountCommands="-u -z" \
     CacheFolderSuffix=""
 
-RUN apk --no-cache upgrade && \
-    apk --no-cache add gettext libc6-compat curl go git alpine-sdk ca-certificates fuse fuse-dev findutils moreutils bash && \
-    echo "Installing S6 Overlay" && \
+RUN apk --no-cache upgrade
+
+RUN apk --no-cache add --virtual .s6-build-deps curl && \
     curl -o /tmp/s6-overlay.tar.gz -L \
     "https://github.com/just-containers/s6-overlay/releases/download/v1.22.1.0/s6-overlay-amd64.tar.gz" && \
     tar xfz /tmp/s6-overlay.tar.gz -C / && \
-    echo "Download and compile rclone" && \
+    apk --no-cache del .s6-build-deps
+
+RUN apk --no-cache add --virtual .rclone-build-deps go git alpine-sdk && \
+    apk --no-cache add --virtual .rclone-run-deps ca-certificates fuse fuse-dev && \
     go get -u -v github.com/rclone/rclone && \
     cp /go/bin/rclone /usr/sbin/ && \
-    apk del go git alpine-sdk && \
+    apk del .rclone-build-deps && \
     rm -rf /usr/lib/go /go /tmp/* /var/cache/apk/* /var/lib/apk/lists/*
 
+RUN apk --no-cache add --virtual .run-deps findutils moreutils bash gettext
+
 COPY rootfs/ /
+
+RUN chmod +x /usr/sbin/*
 
 ENTRYPOINT ["/init"]

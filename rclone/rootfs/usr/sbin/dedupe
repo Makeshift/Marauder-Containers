@@ -1,0 +1,16 @@
+#!/bin/bash
+set +ex
+SERVICE_ACCOUNT_PATH=/service_accounts
+TEAM_DRIVES_COUNT=$(printf "%s\n" ${rclone_team_drive_ids} | wc -l)
+SERVICE_ACCOUNTS=$(find "${SERVICE_ACCOUNT_PATH}" -type f -name "*.json")
+SERVICE_ACCOUNT_COUNT=$(printf "%s\n" "${SERVICE_ACCOUNTS}" | wc -l)
+CONF_FILE=/config/.rclone.conf
+SERVICE_ACCOUNTS_ARR=($SERVICE_ACCOUNTS)
+
+for i in $(seq 0 $TEAM_DRIVES_COUNT); do
+    # Pick a random service account
+    RAND=$(shuf -i 0-${SERVICE_ACCOUNT_COUNT} -n 1)
+    SERVICE_ACCOUNT=${SERVICE_ACCOUNTS_ARR[$RAND]}
+    # Do the dedupe using 'newest' dedupe mode. TODO: Make this configurable?
+    rclone --config $CONF_FILE dedupe gdrive_${i}: -vv --dedupe-mode newest --drive-service-account-file "$SERVICE_ACCOUNT"
+done
