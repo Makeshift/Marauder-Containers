@@ -7,7 +7,8 @@ ENV GOPATH="/go" \
     RemotePath="union:" \
     UnmountCommands="-u -z" \
     CacheFolderSuffix="" \
-    ItemsPerUpload=100
+    ItemsPerUpload=100 \
+    CacheSizePerMountGb=10
 
 RUN apk --no-cache upgrade
 
