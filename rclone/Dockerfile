@@ -6,7 +6,8 @@ ENV GOPATH="/go" \
     ConfigPath="/config/.rclone.conf" \
     RemotePath="union:" \
     UnmountCommands="-u -z" \
-    CacheFolderSuffix=""
+    CacheFolderSuffix="" \
+    ItemsPerUpload=100
 
 RUN apk --no-cache upgrade
 
