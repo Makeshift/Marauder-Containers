@@ -1,6 +1,14 @@
 #!/usr/bin/with-contenv bash
 set +x
 set -o pipefail
+
+_term() { 
+  echo "Caught SIGTERM"
+  exit 0
+}
+
+trap _term SIGTERM
+
 PREFIX=Media/
 SOURCE=/shared/separate/$PREFIX
 MOUNT_LOCATION=/shared/merged/
@@ -82,7 +90,8 @@ while true; do
                 # Copy everything to the mount first to ensure that it's all still available while we're uploading
                 echo $LOG Trying service account $ACCOUNT
                 echo $DEBUG rclone --config "$CONF_FILE" copy -L --files-from "$TMP_FILE" "$SOURCE" "$DEST" --drive-shared-with-me --no-traverse --drive-service-account-file "${ACCOUNT}" --drive-stop-on-upload-limit -v --buffer-size 16M --transfers 6 --use-mmap --low-level-retries 1 --multi-thread-cutoff 25M --multi-thread-streams 8 --no-update-modtime
-                rclone --config "$CONF_FILE" copy -L --files-from "$TMP_FILE" "$SOURCE" "$DEST" --drive-shared-with-me --no-traverse --drive-service-account-file "${ACCOUNT}" --drive-stop-on-upload-limit -v --buffer-size 16M --transfers 6 --use-mmap --low-level-retries 1 --multi-thread-cutoff 25M --multi-thread-streams 8 --no-update-modtime 2>&1 | tee $TMP_LOG
+                (rclone --config "$CONF_FILE" copy -L --files-from "$TMP_FILE" "$SOURCE" "$DEST" --drive-shared-with-me --no-traverse --drive-service-account-file "${ACCOUNT}" --drive-stop-on-upload-limit -v --buffer-size 16M --transfers 6 --use-mmap --low-level-retries 1 --multi-thread-cutoff 25M --multi-thread-streams 8 --no-update-modtime 2>&1 | tee $TMP_LOG) &
+                wait $!
                 RCLONE_EXIT_CODE=$?
                 if [ "${RCLONE_EXIT_CODE}" -ne "0" ] ; then
                     if grep "userRateLimitExceeded" $TMP_LOG > /dev/null; then
@@ -107,7 +116,8 @@ while true; do
                 # Do the 'move', which in theory will just delete the files on the local filesystem. We can assume it'll never hit the transfer cap because
                 #  it'll never actually do any moves.
                 echo $DEBUG rclone --config "$CONF_FILE" move -L --files-from "$TMP_FILE" "$SOURCE" "$DEST" --drive-shared-with-me --fast-list --checkers 12 --delete-empty-src-dirs --drive-service-account-file "${ACCOUNT}" --no-traverse
-                rclone --config "$CONF_FILE" move -L --files-from "$TMP_FILE" "$SOURCE" "$DEST" --drive-shared-with-me --fast-list --checkers 12 --delete-empty-src-dirs --drive-service-account-file "${ACCOUNT}" --no-traverse
+                rclone --config "$CONF_FILE" move -L --files-from "$TMP_FILE" "$SOURCE" "$DEST" --drive-shared-with-me --fast-list --checkers 12 --delete-empty-src-dirs --drive-service-account-file "${ACCOUNT}" --no-traverse &
+                wait $!
                 # If we get here, we can assume we've successfully copied and can kill the loop
                 GLOBAL_ACCOUNT_NUM=$CURRENT_ACCOUNT_NUM
                 break
@@ -137,7 +147,9 @@ while true; do
     # Sleep for a bit if we have any sleeping to do
     if [ "$SLEEP_TIME" -gt 0 ] && [ "$SKIP_WAIT" -eq 0 ]; then
         echo Sleeping for ${SLEEP_TIME}s until next upload run.
-        sleep ${SLEEP_TIME}s
+        # This fancy shenanigans allows SIGTERM to exit while we're sleeping! How cool is that?
+        sleep ${SLEEP_TIME}s &
+        wait $!
     fi
     # Clear vars for the next loop
     unset UPLOAD_LIST COUNT SKIP_WAIT
