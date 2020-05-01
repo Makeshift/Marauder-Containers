@@ -13,7 +13,6 @@ PREFIX=Media/
 SOURCE=/shared/separate/$PREFIX
 MOUNT_LOCATION=/shared/merged/
 MOUNT_NAME_PREFIX=gdrive_upload_crypt_
-CONF_FILE=/config/.rclone.conf
 RCLONE_HOST="127.0.0.1"
 RCLONE_PORT="5572" # I should probably set this from an env var
 COUNT_LIMIT=${ItemsPerUpload}
@@ -42,7 +41,7 @@ while true; do
     echo "$LOG Checking for uploads..."
     if [ -d "$SOURCE" ]; then
         # Get a static list of uploads
-        UPLOAD_LIST=$(rclone --config "$CONF_FILE" lsf -R -L --files-only "$SOURCE" --min-age $MIN_AGE)
+        UPLOAD_LIST=$(rclone lsf -R -L --files-only "$SOURCE" --min-age $MIN_AGE)
         # Count the bytes to check if we actually do have anything to upload
         COUNT_CHARS=$(printf "%s" "$UPLOAD_LIST" | wc -c)
         if [ "$COUNT_CHARS" -gt 0 ]; then
@@ -54,7 +53,7 @@ while true; do
             # Because we might be switching team drives mid-upload, we don't want to upload the same files to multiple team drives, so we limit the upload to
             #  to a certain number of files to naievely avoid mass-duplication
             if [ "$COUNT" -gt "$COUNT_LIMIT" ]; then
-                UPLOAD_LIST=$(trap "" PIPE;echo "$UPLOAD_LIST" | head -n $COUNT_LIMIT)
+                UPLOAD_LIST=$(echo "$UPLOAD_LIST" | head -n $COUNT_LIMIT)
                 echo "$LOG $COUNT is larger than our limit of $COUNT_LIMIT - Truncating the list to $COUNT_LIMIT to avoid duplication if we switch drives. We'll skip the wait to automatically continue processing."
                 SKIP_WAIT=1
             fi
@@ -89,8 +88,8 @@ while true; do
                 fi
                 # Copy everything to the mount first to ensure that it's all still available while we're uploading
                 echo $LOG Trying service account $ACCOUNT
-                echo $DEBUG rclone --config "$CONF_FILE" copy -L --files-from "$TMP_FILE" "$SOURCE" "$DEST" --drive-shared-with-me --no-traverse --drive-service-account-file "${ACCOUNT}" --drive-stop-on-upload-limit -v --buffer-size 16M --transfers 6 --use-mmap --low-level-retries 1 --multi-thread-cutoff 25M --multi-thread-streams 8 --no-update-modtime
-                (rclone --config "$CONF_FILE" copy -L --files-from "$TMP_FILE" "$SOURCE" "$DEST" --drive-shared-with-me --no-traverse --drive-service-account-file "${ACCOUNT}" --drive-stop-on-upload-limit -v --buffer-size 16M --transfers 6 --use-mmap --low-level-retries 1 --multi-thread-cutoff 25M --multi-thread-streams 8 --no-update-modtime 2>&1 | tee $TMP_LOG) &
+                echo $DEBUG rclone copy -L --files-from "$TMP_FILE" "$SOURCE" "$DEST" --drive-service-account-file "${ACCOUNT}" --drive-stop-on-upload-limit -vv --buffer-size 16M --transfers 6 --use-mmap --low-level-retries 1 --multi-thread-cutoff 25M --multi-thread-streams 8 --no-update-modtime
+                (rclone copy -L --files-from "$TMP_FILE" "$SOURCE" "$DEST" --drive-service-account-file "${ACCOUNT}" --drive-stop-on-upload-limit -vv --buffer-size 16M --transfers 6 --use-mmap --low-level-retries 1 --multi-thread-cutoff 25M --multi-thread-streams 8 --no-update-modtime 2>&1 | tee $TMP_LOG) &
                 wait $!
                 RCLONE_EXIT_CODE=$?
                 if [ "${RCLONE_EXIT_CODE}" -ne "0" ] ; then
@@ -107,7 +106,7 @@ while true; do
                             CURRENT_TEAM_DRIVE=0
                         fi
                     fi
-                    # We switch service account anyway because it's just easier :P
+                    # We switch service account anyway because it's just a lazy way to start the loop from the beginning :P
                     continue
                     
                 fi
@@ -115,8 +114,8 @@ while true; do
                 sleep 10s
                 # Do the 'move', which in theory will just delete the files on the local filesystem. We can assume it'll never hit the transfer cap because
                 #  it'll never actually do any moves.
-                echo $DEBUG rclone --config "$CONF_FILE" move -L --files-from "$TMP_FILE" "$SOURCE" "$DEST" --drive-shared-with-me --fast-list --checkers 12 --delete-empty-src-dirs --drive-service-account-file "${ACCOUNT}" --no-traverse
-                rclone --config "$CONF_FILE" move -L --files-from "$TMP_FILE" "$SOURCE" "$DEST" --drive-shared-with-me --fast-list --checkers 12 --delete-empty-src-dirs --drive-service-account-file "${ACCOUNT}" --no-traverse &
+                echo $DEBUG rclone move -L --files-from "$TMP_FILE" "$SOURCE" "$DEST" --checkers 12 -vv --delete-empty-src-dirs --drive-service-account-file "${ACCOUNT}" --use-mmap --low-level-retries 1 --multi-thread-cutoff 25M --multi-thread-streams 8 --no-update-modtime --transfers 0
+                rclone move -L --files-from "$TMP_FILE" "$SOURCE" "$DEST" --checkers 12 -vv --delete-empty-src-dirs --drive-service-account-file "${ACCOUNT}" --use-mmap --low-level-retries 1 --multi-thread-cutoff 25M --multi-thread-streams 8 --no-update-modtime --transfers 0 &
                 wait $!
                 # If we get here, we can assume we've successfully copied and can kill the loop
                 GLOBAL_ACCOUNT_NUM=$CURRENT_ACCOUNT_NUM

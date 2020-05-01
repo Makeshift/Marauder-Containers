@@ -13,15 +13,13 @@ fi
 #remove / at the end #todo
 
 #create folders
-mkdir -p \
-  $MountPoint \
-  /config/ 
+mkdir -p $MountPoint
 
 # Generate multi-drive conf
 read -a rclone_team_drive_ids_arr <<< $rclone_team_drive_ids
 count=0
 for rclone_team_drive_id in "${rclone_team_drive_ids_arr[@]}"; do
-    (envsubst < /rclone_conf/rclone_multi_template) >> /config/.rclone.conf
+    (envsubst < /rclone_conf/rclone_multi_template) >> /config/rclone/rclone.conf
     multi_names="${multi_names} gdrive_mount_crypt_${count}:/:nc"
     count=$((count+1))
 done
@@ -29,4 +27,4 @@ done
 # Create the union
 ## Remove leading space
 multi_names="${multi_names#"${multi_names%%[![:space:]]*}"}"
-(envsubst < /rclone_conf/rclone_union) >> /config/.rclone.conf
+(envsubst < /rclone_conf/rclone_union) >> /config/rclone/rclone.conf

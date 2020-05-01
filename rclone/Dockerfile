@@ -1,9 +1,12 @@
 # Shamelessly adapted from mumiehub/rclone-mount
 FROM alpine:latest
 
+# Using the very latest commit as we're using the bleeding-edge new union
+# TODO: Pin this when a new version comes out
+ENV RCLONE_VERSION="master"
+
 ENV GOPATH="/go" \
     MountPoint="/shared/merged" \
-    ConfigPath="/config/.rclone.conf" \
     RemotePath="union:" \
     UnmountCommands="-u -z" \
     CacheFolderSuffix="" \
@@ -20,12 +23,13 @@ RUN apk --no-cache add --virtual .s6-build-deps curl && \
 
 RUN apk --no-cache add --virtual .rclone-build-deps go git alpine-sdk && \
     apk --no-cache add --virtual .rclone-run-deps ca-certificates fuse fuse-dev && \
-    go get -u -v github.com/rclone/rclone && \
+    go get -u -v github.com/rclone/rclone@${RCLONE_VERSION} && \
     cp /go/bin/rclone /usr/sbin/ && \
     apk del .rclone-build-deps && \
     rm -rf /usr/lib/go /go /tmp/* /var/cache/apk/* /var/lib/apk/lists/*
 
-RUN apk --no-cache add --virtual .run-deps findutils moreutils bash gettext
+RUN apk --no-cache add --virtual .run-deps findutils moreutils bash gettext && \
+    mkdir -p /config/rclone
 
 COPY rootfs/ /
 
