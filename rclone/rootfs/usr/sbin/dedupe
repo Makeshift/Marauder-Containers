@@ -12,7 +12,7 @@ if [ ! -f "/config/rclone/rclone.conf" ]; then
     source /usr/sbin/generate_rclone_config
 fi
 
-for i in $(seq 0 $TEAM_DRIVES_COUNT); do
+for i in $(seq 0 $(($TEAM_DRIVES_COUNT-1))); do
     # Pick a random service account
     RAND=$(shuf -i 0-${SERVICE_ACCOUNT_COUNT} -n 1)
     SERVICE_ACCOUNT=${SERVICE_ACCOUNTS_ARR[$RAND]}
