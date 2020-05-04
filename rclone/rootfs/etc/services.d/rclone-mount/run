@@ -2,6 +2,13 @@
 
 #set -x
 
+_term() { 
+  echo "Caught SIGTERM"
+  exit 0
+}
+
+trap _term SIGTERM
+
 source /etc/colors.sh
 
 PREFFIX="[services.d] [rclone-mount]-$(s6-basename ${0}):"
@@ -11,4 +18,5 @@ MountCommands=$(echo ${MountCommands} | xargs echo -n)
 
 echo -e "${PREFFIX} ${Green}starting rclone mount $(date +%Y.%m.%d-%T)\n ${Yellow} /usr/sbin/rclone mount $MountCommands $RemotePath $MountPoint ${Color_Off}"
 
-/usr/sbin/rclone mount $MountCommands $RemotePath $MountPoint
+/usr/sbin/rclone mount $MountCommands $RemotePath $MountPoint &
+wait $!

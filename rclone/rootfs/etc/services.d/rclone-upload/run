@@ -9,6 +9,7 @@ _term() {
 
 trap _term SIGTERM
 
+SINGLE_UPLOAD=$1
 PREFIX=Media/
 SOURCE=/shared/separate/$PREFIX
 MOUNT_LOCATION=/shared/merged/
@@ -23,12 +24,13 @@ TMP_FILE=/tmp/rclone.uploads
 TMP_LOG=/tmp/rclone.copylog
 MIN_AGE=15m
 SLEEP_SECONDS=600
+# TODO: There's a lot of IFS fuckery going on in this script and I really need to crack down on it.
 IFS='
 '
 LOG="[services.d] [rclone-upload]-$(s6-basename "${0}"):"
 DEBUG="${LOG} [DEBUG]:"
 GLOBAL_ACCOUNT_NUM=0
-TEAM_DRIVES_COUNT=$(printf "%s\n" ${rclone_team_drive_ids} | wc -l)
+TEAM_DRIVES_COUNT=$(IFS=' ';printf "%s\n" ${rclone_team_drive_ids} | wc -l)
 CURRENT_TEAM_DRIVE=0
 
 
@@ -73,8 +75,21 @@ while true; do
             # Start looping through service accounts
             CURRENT_ACCONT_NUM=0
             for ACCOUNT in $SERVICE_ACCOUNTS; do
-                # Work out the current destination based on our team drive
-                DEST=${MOUNT_NAME_PREFIX}${CURRENT_TEAM_DRIVE}:/$PREFIX
+                # Create a union on the fly with our current team drive as the target and all other mounts RO
+                # This allows us to check all the mounts for duplicates while using rclones standard copy/move
+                UNION_UPSTREAMS=""
+                for i in $(seq 0 $(($TEAM_DRIVES_COUNT-1))); do # For each team drive
+                    if [ $i -ne $CURRENT_TEAM_DRIVE ]; then # If the team drive isn't the current one
+                        UNION_UPSTREAMS="${UNION_UPSTREAMS}${MOUNT_NAME_PREFIX}${i}:/${PREFIX}:ro " # Add it to the union in read-only
+                    fi
+                done
+                # Add the current team drive as the final writeable one
+                UNION_UPSTREAMS="${UNION_UPSTREAMS}${MOUNT_NAME_PREFIX}${CURRENT_TEAM_DRIVE}:/${PREFIX}"
+                # Set the export for the union - TODO: The --union-upstreams flag seems broken right now, switch this back to a flag when it's fixed
+                export RCLONE_UNION_UPSTREAMS=$UNION_UPSTREAMS
+                echo $DEBUG Upstreams set to $UNION_UPSTREAMS
+                # Set the destination as our new temporary union
+                DEST=":union:"
                 # If we've burned through a couple of service accounts before, we can skip them
                 CURRENT_ACCOUNT_NUM=$((CURRENT_ACCONT_NUM+1))
                 if [ "$CURRENT_ACCOUNT_NUM" -lt "$GLOBAL_ACCOUNT_NUM" ]; then
@@ -88,8 +103,8 @@ while true; do
                 fi
                 # Copy everything to the mount first to ensure that it's all still available while we're uploading
                 echo $LOG Trying service account $ACCOUNT
-                echo $DEBUG rclone copy --files-from "$TMP_FILE" "$SOURCE" "$DEST" --drive-service-account-file "${ACCOUNT}" --drive-stop-on-upload-limit -v --buffer-size 16M --transfers 6 --use-mmap --low-level-retries 1 --multi-thread-cutoff 25M --multi-thread-streams 8 --no-update-modtime
-                (rclone copy --files-from "$TMP_FILE" "$SOURCE" "$DEST" --drive-service-account-file "${ACCOUNT}" --drive-stop-on-upload-limit -v --buffer-size 16M --transfers 6 --use-mmap --low-level-retries 1 --multi-thread-cutoff 25M --multi-thread-streams 8 --no-update-modtime 2>&1 | tee $TMP_LOG) &
+                echo $DEBUG rclone copy --files-from "$TMP_FILE" "$SOURCE" "$DEST" --drive-service-account-file "${ACCOUNT}" --drive-stop-on-upload-limit -v --buffer-size 16M --transfers 6 --use-mmap --low-level-retries 1 --multi-thread-cutoff 25M --multi-thread-streams 8 --no-update-modtime --drive-server-side-across-configs
+                (rclone copy --files-from "$TMP_FILE" "$SOURCE" "$DEST" --drive-service-account-file "${ACCOUNT}" --drive-stop-on-upload-limit -v --buffer-size 16M --transfers 6 --use-mmap --low-level-retries 1 --multi-thread-cutoff 25M --multi-thread-streams 8 --no-update-modtime --drive-server-side-across-configs 2>&1 | tee $TMP_LOG) &
                 wait $!
                 RCLONE_EXIT_CODE=$?
                 if [ "${RCLONE_EXIT_CODE}" -ne "0" ] ; then
@@ -106,16 +121,18 @@ while true; do
                             CURRENT_TEAM_DRIVE=0
                         fi
                     fi
+                    rm "$TMP_LOG"
                     # We switch service account anyway because it's just a lazy way to start the loop from the beginning :P
                     continue
                     
                 fi
+                rm "$TMP_LOG"
                 # Chill for 10s to make sure Gdrive is consistent
                 sleep 10s
                 # Do the 'move', which in theory will just delete the files on the local filesystem. We can assume it'll never hit the transfer cap because
                 #  it'll never actually do any moves.
-                echo $DEBUG rclone move --files-from "$TMP_FILE" "$SOURCE" "$DEST" --checkers 12 -v --delete-empty-src-dirs --drive-service-account-file "${ACCOUNT}" --use-mmap --low-level-retries 1 --multi-thread-cutoff 25M --multi-thread-streams 8 --no-update-modtime --transfers 0
-                rclone move --files-from "$TMP_FILE" "$SOURCE" "$DEST" --checkers 12 -v --delete-empty-src-dirs --drive-service-account-file "${ACCOUNT}" --use-mmap --low-level-retries 1 --multi-thread-cutoff 25M --multi-thread-streams 8 --no-update-modtime --transfers 0 &
+                echo $DEBUG rclone move --files-from "$TMP_FILE" "$SOURCE" "$DEST" --checkers 12 -v --delete-empty-src-dirs --drive-service-account-file "${ACCOUNT}" --use-mmap --low-level-retries 1 --multi-thread-cutoff 25M --multi-thread-streams 8 --no-update-modtime --transfers 0 --drive-server-side-across-configs
+                rclone move --files-from "$TMP_FILE" "$SOURCE" "$DEST" --checkers 12 -v --delete-empty-src-dirs --drive-service-account-file "${ACCOUNT}" --use-mmap --low-level-retries 1 --multi-thread-cutoff 25M --multi-thread-streams 8 --no-update-modtime --transfers 0 --drive-server-side-across-configs &
                 wait $!
                 # If we get here, we can assume we've successfully copied and can kill the loop
                 GLOBAL_ACCOUNT_NUM=$CURRENT_ACCOUNT_NUM
@@ -124,6 +141,7 @@ while true; do
             echo "$LOG Upload complete"
             # Clean up after ourselves
             rm $TMP_FILE
+            unset RCLONE_UNION_UPSTREAMS
             # Mass refresh everything we uploaded so nothing has a panic attack
             # for p in $DIR_LIST; do
             #     # Add media folder prefix
@@ -138,6 +156,11 @@ while true; do
     else
         echo "$LOG $SOURCE does not exist, skipping upload."
     fi
+    # If we're only running once, quit now
+    if [ "$SINGLE_UPLOAD" -eq 1 ]; then
+        echo "$LOG Upload complete, exiting."
+        exit 0
+    fi
     # Take away the time we spent processing from the repeat time. This ensures we're only doing one upload at once, but if there's
     #  lots of files coming in, we'll continuously upload anything that matches the filter criteria
     END_TIME=$(date +%s)
@@ -151,5 +174,5 @@ while true; do
         wait $!
     fi
     # Clear vars for the next loop
-    unset UPLOAD_LIST COUNT SKIP_WAIT
+    unset UPLOAD_LIST COUNT SKIP_WAIT UNION_UPSTREAMS RCLONE_UNION_UPSTREAMS
 done
