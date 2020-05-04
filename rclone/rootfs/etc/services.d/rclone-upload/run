@@ -157,7 +157,7 @@ while true; do
         echo "$LOG $SOURCE does not exist, skipping upload."
     fi
     # If we're only running once, quit now
-    if [ "$SINGLE_UPLOAD" -eq 1 ]; then
+    if [[ "$SINGLE_UPLOAD" = 1 ]]; then
         echo "$LOG Upload complete, exiting."
         exit 0
     fi
