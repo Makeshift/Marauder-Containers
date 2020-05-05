@@ -56,7 +56,7 @@ while true; do
             #  to a certain number of files to naievely avoid mass-duplication
             if [ "$COUNT" -gt "$COUNT_LIMIT" ]; then
                 UPLOAD_LIST=$(echo "$UPLOAD_LIST" | head -n $COUNT_LIMIT)
-                echo "$LOG $COUNT is larger than our limit of $COUNT_LIMIT - Truncating the list to $COUNT_LIMIT to avoid duplication if we switch drives. We'll skip the wait to automatically continue processing."
+                echo "$LOG $COUNT is larger than our limit of $COUNT_LIMIT - Truncating the list to $COUNT_LIMIT."
                 SKIP_WAIT=1
             fi
             # Print the static list to file
