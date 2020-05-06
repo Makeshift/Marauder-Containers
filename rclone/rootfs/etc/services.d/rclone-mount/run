@@ -18,5 +18,4 @@ MountCommands=$(echo ${MountCommands} | xargs echo -n)
 
 echo -e "${PREFFIX} ${Green}starting rclone mount $(date +%Y.%m.%d-%T)\n ${Yellow} /usr/sbin/rclone mount $MountCommands $RemotePath $MountPoint ${Color_Off}"
 
-/usr/sbin/rclone mount $MountCommands $RemotePath $MountPoint &
-wait $!
+/usr/sbin/rclone mount $MountCommands $RemotePath $MountPoint 

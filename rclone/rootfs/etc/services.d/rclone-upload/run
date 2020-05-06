@@ -16,7 +16,13 @@ MOUNT_LOCATION=/shared/merged/
 MOUNT_NAME_PREFIX=gdrive_upload_crypt_
 RCLONE_HOST="127.0.0.1"
 RCLONE_PORT="5572" # I should probably set this from an env var
+# These two are used to dictate how many files we should attempt per upload, and
+#  the size of the batch upload, whichever is smaller.
+# Because we don't delete anything from disk until after the upload is complete, this is useful
+#  to free up space mid-upload if a lot of files get dropped in at once
 COUNT_LIMIT=${ItemsPerUpload}
+SIZE_LIMIT=${MaxGbPerUpload}
+
 SERVICE_ACCOUNT_PATH=/service_accounts
 SERVICE_ACCOUNTS=$(find "${SERVICE_ACCOUNT_PATH}" -type f -name "*.json")
 SERVICE_ACCOUNT_COUNT=$(printf "%s" "${SERVICE_ACCOUNTS}" | wc -l)
@@ -42,8 +48,16 @@ while true; do
     SKIP_WAIT=0
     echo "$LOG Checking for uploads..."
     if [ -d "$SOURCE" ]; then
-        # Get a static list of uploads
-        UPLOAD_LIST=$(rclone lsf -R -L --files-only "$SOURCE" --min-age $MIN_AGE)
+        # Get a list of uploads adding up to our maximum size
+        UPLOAD_LIST=$(rclone lsf -R -L --files-only --format "sp" --separator "    " "$SOURCE" --min-age $MIN_AGE | dirsplit -n -s ${SIZE_LIMIT}G -T- 2>&1)
+        if echo "$UPLOAD_LIST" | grep "Too large object" > /dev/null; then
+            # We found a file that's bigger than our maximum size - Only upload that file.
+            echo $LOG We found a file larger than ${SIZE_LIMIT}GB in our upload list. Uploading only that file now.
+            UPLOAD_LIST=$(echo "$UPLOAD_LIST" | awk -F': ' '{print $2}' | awk -F' \\(maybe' '{print $1}')
+        else
+            # Otherwise, we parse the output of dirsplit for "CD 1" which contains our files with a size limit
+            UPLOAD_LIST=$(echo "$UPLOAD_LIST" | grep "^1:" | awk -F'=' '{print $2}')
+        fi
         # Count the bytes to check if we actually do have anything to upload
         COUNT_CHARS=$(printf "%s" "$UPLOAD_LIST" | wc -c)
         if [ "$COUNT_CHARS" -gt 0 ]; then
@@ -104,7 +118,7 @@ while true; do
                 # Copy everything to the mount first to ensure that it's all still available while we're uploading
                 echo $LOG Trying service account $ACCOUNT
                 echo $DEBUG rclone copy --files-from "$TMP_FILE" "$SOURCE" "$DEST" --drive-service-account-file "${ACCOUNT}" --drive-stop-on-upload-limit -v --buffer-size 16M --transfers 6 --use-mmap --low-level-retries 1 --multi-thread-cutoff 25M --multi-thread-streams 8 --no-update-modtime --drive-server-side-across-configs
-                (rclone copy --files-from "$TMP_FILE" "$SOURCE" "$DEST" --drive-service-account-file "${ACCOUNT}" --drive-stop-on-upload-limit -v --buffer-size 16M --transfers 6 --use-mmap --low-level-retries 1 --multi-thread-cutoff 25M --multi-thread-streams 8 --no-update-modtime --drive-server-side-across-configs 2>&1 | tee $TMP_LOG) &
+                (rclone copy --files-from "$TMP_FILE" "$SOURCE" "$DEST" --drive-service-account-file "${ACCOUNT}" --drive-stop-on-upload-limit -v --buffer-size 16M --transfers 6 --use-mmap --low-level-retries 1 --multi-thread-cutoff 25M --multi-thread-streams 8 --no-update-modtime --drive-server-side-across-configs 2>&1 | grep -v "Free Space is not supported for upstream" | tee $TMP_LOG) &
                 wait $!
                 RCLONE_EXIT_CODE=$?
                 if [ "${RCLONE_EXIT_CODE}" -ne "0" ] ; then
@@ -132,7 +146,7 @@ while true; do
                 # Do the 'move', which in theory will just delete the files on the local filesystem. We can assume it'll never hit the transfer cap because
                 #  it'll never actually do any moves.
                 echo $DEBUG rclone move --files-from "$TMP_FILE" "$SOURCE" "$DEST" --checkers 12 -v --delete-empty-src-dirs --drive-service-account-file "${ACCOUNT}" --use-mmap --low-level-retries 1 --multi-thread-cutoff 25M --multi-thread-streams 8 --no-update-modtime --transfers 0 --drive-server-side-across-configs
-                rclone move --files-from "$TMP_FILE" "$SOURCE" "$DEST" --checkers 12 -v --delete-empty-src-dirs --drive-service-account-file "${ACCOUNT}" --use-mmap --low-level-retries 1 --multi-thread-cutoff 25M --multi-thread-streams 8 --no-update-modtime --transfers 0 --drive-server-side-across-configs &
+                (rclone move --files-from "$TMP_FILE" "$SOURCE" "$DEST" --checkers 12 -v --delete-empty-src-dirs --drive-service-account-file "${ACCOUNT}" --use-mmap --low-level-retries 1 --multi-thread-cutoff 25M --multi-thread-streams 8 --no-update-modtime --transfers 0 --drive-server-side-across-configs | grep -v "Free Space is not supported for upstream") &
                 wait $!
                 # If we get here, we can assume we've successfully copied and can kill the loop
                 GLOBAL_ACCOUNT_NUM=$CURRENT_ACCOUNT_NUM

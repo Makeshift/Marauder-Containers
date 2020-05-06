@@ -7,7 +7,8 @@ ENV GOPATH="/go" \
     UnmountCommands="-u -z" \
     CacheFolderSuffix="" \
     ItemsPerUpload=100 \
-    CacheSizePerMountGb=10
+    CacheSizePerMountGb=10 \
+    MaxGbPerUpload=25
 
 RUN apk --no-cache upgrade
 
@@ -24,8 +25,7 @@ RUN apk --no-cache add --virtual .rclone-build-deps go git alpine-sdk && \
     apk del .rclone-build-deps && \
     rm -rf /usr/lib/go /go /tmp/* /var/cache/apk/* /var/lib/apk/lists/*
 
-RUN apk --no-cache add --virtual .run-deps findutils moreutils bash gettext && \
-    mkdir -p /config/rclone
+RUN apk --no-cache add --virtual .run-deps findutils moreutils bash gettext cdrkit grep gawk
 
 COPY rootfs/ /
 
