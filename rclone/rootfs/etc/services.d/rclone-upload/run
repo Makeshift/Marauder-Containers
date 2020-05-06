@@ -54,7 +54,12 @@ while true; do
             # We found a file that's bigger than our maximum size - Only upload that file.
             echo $LOG We found a file larger than ${SIZE_LIMIT}GB in our upload list. Uploading only that file now.
             UPLOAD_LIST=$(echo "$UPLOAD_LIST" | awk -F': ' '{print $2}' | awk -F' \\(maybe' '{print $1}')
+            SKIP_WAIT=1
         else
+            # Check if we have more than one set to upload, in which case we can skip the wait
+            if echo "$UPLOAD_LIST" | grep "^2:" > /dev/null; then
+                SKIP_WAIT=1
+            fi
             # Otherwise, we parse the output of dirsplit for "CD 1" which contains our files with a size limit
             UPLOAD_LIST=$(echo "$UPLOAD_LIST" | grep "^1:" | awk -F'=' '{print $2}')
         fi
