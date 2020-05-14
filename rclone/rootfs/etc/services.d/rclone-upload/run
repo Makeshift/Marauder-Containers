@@ -33,26 +33,35 @@ SLEEP_SECONDS=600
 # TODO: There's a lot of IFS fuckery going on in this script and I really need to crack down on it.
 IFS='
 '
-LOG="[services.d] [rclone-upload]-$(s6-basename "${0}"):"
-DEBUG="${LOG} [DEBUG]:"
 GLOBAL_ACCOUNT_NUM=0
 TEAM_DRIVES_COUNT=$(IFS=' ';printf "%s\n" ${rclone_team_drive_ids} | wc -l)
 CURRENT_TEAM_DRIVE=0
 
+function LOG {
+    echo "[services.d] [rclone-upload]-$(s6-basename "${0}"): $1"
+}
+
+function DEBUG_LOG {
+    if [ "$DEBUG" ]; then
+        LOG "[DEBUG] $1"
+    fi
+}
+
 
 rm $TMP_FILE > /dev/null 2>&1
 
-echo "$LOG Starting upload service"
+LOG "Starting upload service"
 while true; do 
     START_TIME=$(date +%s)
     SKIP_WAIT=0
-    echo "$LOG Checking for uploads..."
+    LOG "Checking for uploads..."
     if [ -d "$SOURCE" ]; then
         # Get a list of uploads adding up to our maximum size
-        UPLOAD_LIST=$(rclone lsf -R -L --files-only --format "sp" --separator "    " "$SOURCE" --min-age $MIN_AGE | dirsplit -n -s ${SIZE_LIMIT}G -T- 2>&1)
+        UPLOAD_LIST_TOTAL=$(rclone lsf -R -L --files-only --format "sp" --separator "    " "$SOURCE" --min-age $MIN_AGE)
+        UPLOAD_LIST=$(echo "$UPLOAD_LIST_TOTAL" | dirsplit -n -s ${SIZE_LIMIT}G -T- 2>&1)
         if echo "$UPLOAD_LIST" | grep "Too large object" > /dev/null; then
             # We found a file that's bigger than our maximum size - Only upload that file.
-            echo $LOG We found a file larger than ${SIZE_LIMIT}GB in our upload list. Uploading only that file now.
+            LOG "We found a file larger than ${SIZE_LIMIT}GB in our upload list. Uploading only that file now."
             UPLOAD_LIST=$(echo "$UPLOAD_LIST" | awk -F': ' '{print $2}' | awk -F' \\(maybe' '{print $1}')
             SKIP_WAIT=1
         else
@@ -60,7 +69,7 @@ while true; do
             if echo "$UPLOAD_LIST" | grep "^2:" > /dev/null; then
                 SKIP_WAIT=1
             fi
-            # Otherwise, we parse the output of dirsplit for "CD 1" which contains our files with a size limit
+            # Parse the output of dirsplit for "CD 1" which contains our files with a size limit
             UPLOAD_LIST=$(echo "$UPLOAD_LIST" | grep "^1:" | awk -F'=' '{print $2}')
         fi
         # Count the bytes to check if we actually do have anything to upload
@@ -70,12 +79,13 @@ while true; do
             #  also, this is sort of cheeky since it'll always return at least 1, but we already checked if we
             #  have stuff to upload so it's cool
             COUNT=$(printf "%s\n" "$UPLOAD_LIST" | wc -l)
-            echo "$LOG Found ${COUNT} files to upload!"
+            TOTAL_COUNT=$(printf "%s\n" "$UPLOAD_LIST_TOTAL" | wc -l)
+            LOG "Uploading ${COUNT} files out of ${TOTAL_COUNT} files found"
             # Because we might be switching team drives mid-upload, we don't want to upload the same files to multiple team drives, so we limit the upload to
             #  to a certain number of files to naievely avoid mass-duplication
             if [ "$COUNT" -gt "$COUNT_LIMIT" ]; then
                 UPLOAD_LIST=$(echo "$UPLOAD_LIST" | head -n $COUNT_LIMIT)
-                echo "$LOG $COUNT is larger than our limit of $COUNT_LIMIT - Truncating the list to $COUNT_LIMIT."
+                LOG "$COUNT is larger than our limit of $COUNT_LIMIT - Truncating the list to $COUNT_LIMIT."
                 SKIP_WAIT=1
             fi
             # Print the static list to file
@@ -92,8 +102,21 @@ while true; do
             # DIR_LIST=$(echo "$DIR_LIST" | sort | uniq -d)
             # echo $DIR_LIST
             # Start looping through service accounts
-            CURRENT_ACCONT_NUM=0
+            CURRENT_ACCOUNT_NUM=0
             for ACCOUNT in $SERVICE_ACCOUNTS; do
+                # If we've burned through a couple of service accounts before, we can skip them
+                let "CURRENT_ACCOUNT_NUM++"
+                DEBUG_LOG "Checking if current account number $CURRENT_ACCOUNT_NUM is less than the global counter $GLOBAL_ACCOUNT_NUM"
+                if [ "$CURRENT_ACCOUNT_NUM" -lt "$GLOBAL_ACCOUNT_NUM" ]; then
+                    DEBUG_LOG "Skipping account $ACCOUNT"
+                    # If we've burned through all our service accounts in this session, reset the global counter to 0
+                    if [ "$SERVICE_ACCOUNT_COUNT" -eq "$GLOBAL_ACCOUNT_NUM" ]; then
+                        LOG "We've burned through all $SERVICE_ACCOUNT_COUNT of our service accounts - Restarting at the first one"
+                        GLOBAL_ACCOUNT_NUM=0
+                        SKIP_WAIT=1
+                    fi
+                    continue
+                fi
                 # Create a union on the fly with our current team drive as the target and all other mounts RO
                 # This allows us to check all the mounts for duplicates while using rclones standard copy/move
                 UNION_UPSTREAMS=""
@@ -106,35 +129,24 @@ while true; do
                 UNION_UPSTREAMS="${UNION_UPSTREAMS}${MOUNT_NAME_PREFIX}${CURRENT_TEAM_DRIVE}:/${PREFIX}"
                 # Set the export for the union - TODO: The --union-upstreams flag seems broken right now, switch this back to a flag when it's fixed
                 export RCLONE_UNION_UPSTREAMS=$UNION_UPSTREAMS
-                echo $DEBUG Upstreams set to $UNION_UPSTREAMS
+                DEBUG_LOG "Upstreams set to $UNION_UPSTREAMS"
                 # Set the destination as our new temporary union
                 DEST=":union:"
-                # If we've burned through a couple of service accounts before, we can skip them
-                CURRENT_ACCOUNT_NUM=$((CURRENT_ACCONT_NUM+1))
-                if [ "$CURRENT_ACCOUNT_NUM" -lt "$GLOBAL_ACCOUNT_NUM" ]; then
-                    # If we've burned through all our service accounts in this session, reset the global counter to 0
-                    #  This means we'll exit the loop and not actually upload anything this time, but that just means we'll
-                    #  tell rclone to clear caches unneccessarily and wait 10 minutes before uploading - oh well.
-                    if [ "$SERVICE_ACCOUNT_COUNT" -eq "$GLOBAL_ACCOUNT_NUM" ]; then
-                        GLOBAL_ACCOUNT_NUM=0
-                    fi
-                    continue
-                fi
                 # Copy everything to the mount first to ensure that it's all still available while we're uploading
-                echo $LOG Trying service account $ACCOUNT
-                echo $DEBUG rclone copy --files-from "$TMP_FILE" "$SOURCE" "$DEST" --drive-service-account-file "${ACCOUNT}" --drive-stop-on-upload-limit -v --buffer-size 16M --transfers 6 --use-mmap --low-level-retries 1 --multi-thread-cutoff 25M --multi-thread-streams 8 --no-update-modtime --drive-server-side-across-configs
+                LOG "Trying service account $ACCOUNT"
+                DEBUG_LOG "rclone copy --files-from "$TMP_FILE" "$SOURCE" "$DEST" --drive-service-account-file "${ACCOUNT}" --drive-stop-on-upload-limit -v --buffer-size 16M --transfers 6 --use-mmap --low-level-retries 1 --multi-thread-cutoff 25M --multi-thread-streams 8 --no-update-modtime --drive-server-side-across-configs"
                 (rclone copy --files-from "$TMP_FILE" "$SOURCE" "$DEST" --drive-service-account-file "${ACCOUNT}" --drive-stop-on-upload-limit -v --buffer-size 16M --transfers 6 --use-mmap --low-level-retries 1 --multi-thread-cutoff 25M --multi-thread-streams 8 --no-update-modtime --drive-server-side-across-configs 2>&1 | grep -v "Free Space is not supported for upstream" | tee $TMP_LOG) &
                 wait $!
                 RCLONE_EXIT_CODE=$?
                 if [ "${RCLONE_EXIT_CODE}" -ne "0" ] ; then
                     if grep "userRateLimitExceeded" $TMP_LOG > /dev/null; then
                         # Skip to the next service account. It might try to copy the same files twice, but that only costs us an API call.
-                        echo $LOG Rclone exited ${RCLONE_EXIT_CODE} with error userRateLimitExceeded using account $ACCOUNT - Switching service account
+                        LOG "Rclone exited ${RCLONE_EXIT_CODE} with error userRateLimitExceeded using account $ACCOUNT - Switching service account"
                     fi
                     # Rclone exited non-zero, check which error it is (We're going to switch service accounts anyway because it means less coding ;))
                     # TODO: Make it look out for the service account error properly
                     if grep "teamDriveFileLimitExceeded" $TMP_LOG > /dev/null; then
-                        echo $LOG Rclone claims teamDriveFileLimitExceeded, switching team drive if possible
+                        LOG "Rclone claims teamDriveFileLimitExceeded, switching team drive if possible"
                         CURRENT_TEAM_DRIVE=$((CURRENT_TEAM_DRIVE+1))
                         if [ "$CURRENT_TEAM_DRIVE" -gt "$TEAM_DRIVES_COUNT" ]; then
                             CURRENT_TEAM_DRIVE=0
@@ -150,14 +162,15 @@ while true; do
                 sleep 10s
                 # Do the 'move', which in theory will just delete the files on the local filesystem. We can assume it'll never hit the transfer cap because
                 #  it'll never actually do any moves.
-                echo $DEBUG rclone move --files-from "$TMP_FILE" "$SOURCE" "$DEST" --checkers 12 -v --delete-empty-src-dirs --drive-service-account-file "${ACCOUNT}" --use-mmap --low-level-retries 1 --multi-thread-cutoff 25M --multi-thread-streams 8 --no-update-modtime --transfers 0 --drive-server-side-across-configs
+                DEBUG_LOG "rclone move --files-from "$TMP_FILE" "$SOURCE" "$DEST" --checkers 12 -v --delete-empty-src-dirs --drive-service-account-file "${ACCOUNT}" --use-mmap --low-level-retries 1 --multi-thread-cutoff 25M --multi-thread-streams 8 --no-update-modtime --transfers 0 --drive-server-side-across-configs"
                 (rclone move --files-from "$TMP_FILE" "$SOURCE" "$DEST" --checkers 12 -v --delete-empty-src-dirs --drive-service-account-file "${ACCOUNT}" --use-mmap --low-level-retries 1 --multi-thread-cutoff 25M --multi-thread-streams 8 --no-update-modtime --transfers 0 --drive-server-side-across-configs | grep -v "Free Space is not supported for upstream") &
                 wait $!
                 # If we get here, we can assume we've successfully copied and can kill the loop
+                DEBUG_LOG "Upload complete - Setting global account counter to the current counter $CURRENT_ACCOUNT_NUM"
                 GLOBAL_ACCOUNT_NUM=$CURRENT_ACCOUNT_NUM
                 break
             done
-            echo "$LOG Upload complete"
+            LOG "Upload complete"
             # Clean up after ourselves
             rm $TMP_FILE
             unset RCLONE_UNION_UPSTREAMS
@@ -170,14 +183,14 @@ while true; do
             #     ls "${MOUNT_LOCATION}${p}" >/dev/null &
             # done
         else
-            echo "$LOG Nothing to upload in $SOURCE"
+            LOG "Nothing to upload in $SOURCE"
         fi
     else
-        echo "$LOG $SOURCE does not exist, skipping upload."
+        LOG "$SOURCE does not exist, skipping upload."
     fi
     # If we're only running once, quit now
     if [[ "$SINGLE_UPLOAD" = 1 ]]; then
-        echo "$LOG Upload complete, exiting."
+        LOG "Upload complete, exiting."
         exit 0
     fi
     # Take away the time we spent processing from the repeat time. This ensures we're only doing one upload at once, but if there's
@@ -187,11 +200,11 @@ while true; do
     SLEEP_TIME=$(expr ${SLEEP_SECONDS} - ${WORK_TIME})
     # Sleep for a bit if we have any sleeping to do
     if [ "$SLEEP_TIME" -gt 0 ] && [ "$SKIP_WAIT" -eq 0 ]; then
-        echo Sleeping for ${SLEEP_TIME}s until next upload run.
+        LOG "Sleeping for ${SLEEP_TIME}s until next upload run."
         # This fancy shenanigans allows SIGTERM to exit while we're sleeping! How cool is that?
         sleep ${SLEEP_TIME}s &
         wait $!
     fi
     # Clear vars for the next loop
-    unset UPLOAD_LIST COUNT SKIP_WAIT UNION_UPSTREAMS RCLONE_UNION_UPSTREAMS
+    unset UPLOAD_LIST COUNT SKIP_WAIT UNION_UPSTREAMS RCLONE_UNION_UPSTREAMS CURRENT_ACCOUNT_NUM UPLOAD_LIST_TOTAL
 done
