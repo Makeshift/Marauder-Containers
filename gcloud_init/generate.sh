@@ -11,12 +11,13 @@ PROJECT_NAME=${PROJECT_NAME:="${PROJECT_NAME_PREFIX}$(cat /dev/urandom | tr -dc 
 
 echo -e "${Yellow}******************************${C}"
 echo -e "${Green}Current configuration:"
-#echo -e "${Cyan}PROJECT_NAME_PREFIX   ${Green}:${C}    ${PROJECT_NAME_PREFIX}"
+echo -e "${Cyan}PROJECT_NAME_PREFIX   ${Green}:${C}    ${PROJECT_NAME_PREFIX}"
 echo -e "${Cyan}PROJECT_NAME          ${Green}:${C}    ${PROJECT_NAME}"
 echo -e "${Cyan}EXPORT_LOCATION       ${Green}:${C}    ${EXPORT_LOCATION}"
 echo -e "${Cyan}SA_EMAIL_PREFIX       ${Green}:${C}    ${SA_EMAIL_PREFIX}"
-echo -e "${Cyan}GROUP_NAME            ${Green}:${C}    ${GROUP_NAME}"
+#echo -e "${Cyan}GROUP_NAME            ${Green}:${C}    ${GROUP_NAME}"
 echo -e "${Cyan}NUM_OF_SA             ${Green}:${C}    ${NUM_OF_SA}"
+echo -e "${Cyan}GROUP_EMAIL           ${Green}:${C}    ${GROUP_EMAIL}"
 echo -e "${Yellow}******************************${C}"
 
 echo -e "${Red}!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!${C}"
@@ -35,11 +36,11 @@ then
     exit 1
 fi
 
-if [ ! -z GROUP_EMAIl ]; then
+if [ -z $GROUP_EMAIL ]; then
     echo -e "${Cyan}Please type in the email address for the group, followed by [${Green}ENTER${Cyan}]:${C} "
     read GROUP_EMAIL
     if [[ $GROUP_EMAIL != *"@"* ]]; then
-        echo -e "${Red}The string ${Yellow}${GROUP_EMAIL}${Red} doesn't look like a valid email address.${C}"
+        echo -e "${Red}The string ${Yellow}${GROUP_EMAIL}${Red} doesn't look like a valid email address. It should be in the format ${Cyan}<${Yellow}group_name${Cyan}>${Green}@${Yellow}your_domain.tld${C}"
         exit 1
     fi
 fi
