@@ -20,12 +20,11 @@ RUN apk --no-cache add --virtual .s6-build-deps curl && \
 
 RUN apk --no-cache add --virtual .rclone-build-deps go git alpine-sdk && \
     apk --no-cache add --virtual .rclone-run-deps ca-certificates fuse fuse-dev && \
+    apk --no-cache add --virtual .run-deps findutils moreutils bash gettext cdrkit grep gawk && \
     go get -u -v github.com/rclone/rclone && \
     cp /go/bin/rclone /usr/sbin/ && \
     apk del .rclone-build-deps && \
     rm -rf /usr/lib/go /go /tmp/* /var/cache/apk/* /var/lib/apk/lists/*
-
-RUN apk --no-cache add --virtual .run-deps findutils moreutils bash gettext cdrkit grep gawk
 
 COPY rootfs/ /
 

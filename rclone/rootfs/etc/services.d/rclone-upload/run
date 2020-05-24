@@ -80,11 +80,12 @@ while true; do
             #  have stuff to upload so it's cool
             COUNT=$(printf "%s\n" "$UPLOAD_LIST" | wc -l)
             TOTAL_COUNT=$(printf "%s\n" "$UPLOAD_LIST_TOTAL" | wc -l)
-            LOG "Uploading ${COUNT} files out of ${TOTAL_COUNT} files found"
+            LOG "Uploading ${COUNT} files out of ${TOTAL_COUNT} files found to meet our ${SIZE_LIMIT}GB-per-run upload restriction."
             # Because we might be switching team drives mid-upload, we don't want to upload the same files to multiple team drives, so we limit the upload to
             #  to a certain number of files to naievely avoid mass-duplication
             if [ "$COUNT" -gt "$COUNT_LIMIT" ]; then
                 UPLOAD_LIST=$(echo "$UPLOAD_LIST" | head -n $COUNT_LIMIT)
+                COUNT=$COUNT_LIMIT
                 LOG "$COUNT is larger than our limit of $COUNT_LIMIT - Truncating the list to $COUNT_LIMIT."
                 SKIP_WAIT=1
             fi
@@ -133,7 +134,7 @@ while true; do
                 # Set the destination as our new temporary union
                 DEST=":union:"
                 # Copy everything to the mount first to ensure that it's all still available while we're uploading
-                LOG "Trying service account $ACCOUNT"
+                LOG "Upload started with account $ACCOUNT"
                 DEBUG_LOG "rclone copy --files-from "$TMP_FILE" "$SOURCE" "$DEST" --drive-service-account-file "${ACCOUNT}" --drive-stop-on-upload-limit -v --buffer-size 16M --transfers 6 --use-mmap --low-level-retries 1 --multi-thread-cutoff 25M --multi-thread-streams 8 --no-update-modtime --drive-server-side-across-configs"
                 (rclone copy --files-from "$TMP_FILE" "$SOURCE" "$DEST" --drive-service-account-file "${ACCOUNT}" --drive-stop-on-upload-limit -v --buffer-size 16M --transfers 6 --use-mmap --low-level-retries 1 --multi-thread-cutoff 25M --multi-thread-streams 8 --no-update-modtime --drive-server-side-across-configs 2>&1 | grep -v "Free Space is not supported for upstream" | tee $TMP_LOG) &
                 wait $!
@@ -162,6 +163,7 @@ while true; do
                 sleep 10s
                 # Do the 'move', which in theory will just delete the files on the local filesystem. We can assume it'll never hit the transfer cap because
                 #  it'll never actually do any moves.
+                LOG "Upload of ${COUNT} files complete, cleaning up local files"
                 DEBUG_LOG "rclone move --files-from "$TMP_FILE" "$SOURCE" "$DEST" --checkers 12 -v --delete-empty-src-dirs --drive-service-account-file "${ACCOUNT}" --use-mmap --low-level-retries 1 --multi-thread-cutoff 25M --multi-thread-streams 8 --no-update-modtime --transfers 0 --drive-server-side-across-configs"
                 (rclone move --files-from "$TMP_FILE" "$SOURCE" "$DEST" --checkers 12 -v --delete-empty-src-dirs --drive-service-account-file "${ACCOUNT}" --use-mmap --low-level-retries 1 --multi-thread-cutoff 25M --multi-thread-streams 8 --no-update-modtime --transfers 0 --drive-server-side-across-configs | grep -v "Free Space is not supported for upstream") &
                 wait $!

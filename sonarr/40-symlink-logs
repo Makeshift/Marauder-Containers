@@ -1,0 +1,7 @@
+#!/usr/bin/with-contenv bash
+cd /config/logs && \
+rm -f sonarr.txt sonarr.debug.txt sonarr.trace.txt && \
+ln -sf /proc/1/fd/1 sonarr.txt && \
+ln -sf /proc/1/fd/1 sonarr.debug.txt && \
+ln -sf /proc/1/fd/1 sonarr.trace.txt && \
+chown -h 65534:65534 sonarr.txt sonarr.debug.txt sonarr.trace.txt

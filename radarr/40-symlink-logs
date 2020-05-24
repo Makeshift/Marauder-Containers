@@ -1,0 +1,7 @@
+#!/usr/bin/with-contenv bash
+cd /config/logs && \
+rm -f radarr.txt radarr.debug.txt radarr.trace.txt && \
+ln -sf /proc/1/fd/1 radarr.txt && \
+ln -sf /proc/1/fd/1 radarr.debug.txt && \
+ln -sf /proc/1/fd/1 radarr.trace.txt && \
+chown -h 65534:65534 radarr.txt radarr.debug.txt radarr.trace.txt
