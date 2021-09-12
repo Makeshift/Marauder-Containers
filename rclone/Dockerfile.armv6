@@ -1,0 +1,45 @@
+FROM alpine AS builder
+
+# Download QEMU, see https://github.com/docker/hub-feedback/issues/1261
+ENV QEMU_URL https://github.com/balena-io/qemu/releases/download/v5.2.0%2Bbalena4/qemu-5.2.0.balena4-arm.tar.gz
+RUN apk update && apk add curl && \
+  curl -L ${QEMU_URL} | tar zxvf - -C . --strip-components 1
+
+FROM arm32v7/alpine:latest
+
+# Add QEMU
+COPY --from=builder qemu-arm-static /usr/bin
+
+ARG S6_ARCH=arm
+
+#########
+# Below this line, Dockerfile.template is inserted
+#########
+ENV GOPATH="/go" \
+  MountPoint="/shared/merged" \
+  RemotePath="union:" \
+  UnmountCommands="-u -z" \
+  CacheFolderSuffix="" \
+  ItemsPerUpload=100 \
+  CacheSizePerMountGb=10 \
+  MaxGbPerUpload=25
+
+RUN apk --no-cache add --virtual .s6-build-deps curl && \
+  curl -o /tmp/s6-overlay.tar.gz -L \
+  "https://github.com/just-containers/s6-overlay/releases/download/v1.22.1.0/s6-overlay-$S6_ARCH.tar.gz" && \
+  tar xfz /tmp/s6-overlay.tar.gz -C / && \
+  apk --no-cache del .s6-build-deps
+
+RUN apk --no-cache add --virtual .rclone-build-deps go git alpine-sdk && \
+  apk --no-cache add --virtual .rclone-run-deps ca-certificates fuse fuse-dev && \
+  apk --no-cache add --virtual .run-deps findutils moreutils bash gettext cdrkit grep gawk && \
+  GO111MODULE=on go get -v github.com/rclone/rclone && \
+  cp /go/bin/rclone /usr/sbin/ && \
+  apk del .rclone-build-deps && \
+  rm -rf /usr/lib/go /go /tmp/* /var/cache/apk/* /var/lib/apk/lists/*
+
+COPY rootfs/ /
+
+RUN chmod +x /usr/sbin/*
+
+ENTRYPOINT ["/init"]

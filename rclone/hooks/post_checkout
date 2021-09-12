@@ -1,0 +1,5 @@
+#!/bin/bash
+
+for arch in armv6 armv7
+
+cat Dockerfile.template >> Dockerfile.amd64

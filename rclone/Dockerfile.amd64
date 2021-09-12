@@ -1,0 +1,7 @@
+FROM amd64/alpine:latest
+
+ARG S6_ARCH=amd64
+
+#########
+# Below this line, Dockerfile.template is inserted
+#########

@@ -1,0 +1,11 @@
+image: makeshift27015/rclone:latest
+manifests:
+  - image: makeshift27015/rclone:amd64
+    platform:
+      architecture: amd64
+      os: linux
+  - image: makeshift27015/rclone:arm32v5
+    platform:
+      architecture: arm
+      os: linux
+      variant: v5

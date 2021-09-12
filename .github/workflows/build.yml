@@ -1,0 +1,5 @@
+name: Build containers
+
+on:
+  push:
+    branches: ['master']
