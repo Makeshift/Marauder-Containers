@@ -1,0 +1,18 @@
+name: Build containers
+
+on: push
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Build bazarr
+        uses: ./.github/actions/build-and-push-container
+        with:
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          context: bazarr/
+          image: makeshift27015/bazarr

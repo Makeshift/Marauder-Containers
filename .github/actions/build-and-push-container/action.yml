@@ -1,0 +1,38 @@
+inputs:
+  username:
+    description: Docker Hub username
+    default: makeshift27015
+  password:
+    description: Docker Hub password or token
+    required: true
+  context:
+    description: Dockerfile context
+    default: .
+  image:
+    description: Image name
+    required: true
+  latest_tag_branch:
+    description: What branch should be labelled as the 'latest' tag?
+    default: master
+
+
+runs:
+  using: composite
+  steps:
+    - name: Inject slug/short variables
+      uses: rlespinasse/github-slug-action
+
+    - name: Log in to Docker Hub
+      uses: docker/login-action
+      with:
+        username: ${{ inputs.username }}
+        password: ${{ inputs.password }}
+
+    - name: Build and push Docker image
+      uses: docker/build-push-action
+      with:
+        context: ${{ inputs.context }}
+        push: true
+        tags: 
+          - "${{ env.GITHUB_REF_SLUG_URL == input.latest_tag_branch && 'latest' || env.GITHUB_REF_SLUG_URL }}"
+          - "${{ env.GITHUB_SHA_SHORT }}"
