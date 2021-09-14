@@ -34,3 +34,4 @@ runs:
         context: ${{ inputs.context }}
         push: true
         tags: "${{ inputs.image }}:${{ env.GITHUB_REF_SLUG_URL == inputs.latest_tag_branch && 'latest' || env.GITHUB_REF_SLUG_URL }},${{ inputs.image }}:${{ env.GITHUB_SHA_SHORT }}"
+        cache-from: "${{ inputs.image }}:${{ env.GITHUB_REF_SLUG_URL == inputs.latest_tag_branch && 'latest' || env.GITHUB_REF_SLUG_URL }}"
