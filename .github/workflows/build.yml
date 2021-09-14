@@ -19,22 +19,21 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        group: [ 
-          { image: "makeshift27015/bazarr",
-            context: "bazarr/" },
-          { image: "makeshift27015/marauder_gcloud_init",
-            context: "gcloud_init/" },
-          { image: "makeshift27015/radarr",
-            context: "radarr/" },
-          { image: "makeshift27015/rclone",
-            context: "rclone/" },
-          { image: "makeshift27015/marauder_rclone_generate_keys",
-            context: "rclone_generate_keys/" },
-          { image: "makeshift27015/sonarr",
-            context: "sonarr/" },
-          { image: "makeshift27015/traktarr",
-            context: "traktarr/" },
-        ]
+        group: 
+          - image: "makeshift27015/bazarr"
+            context: "bazarr/"
+          - image: "makeshift27015/marauder_gcloud_init"
+            context: "gcloud_init/"
+          - image: "makeshift27015/radarr"
+            context: "radarr/"
+          - image: "makeshift27015/rclone"
+            context: "rclone/"
+          - image: "makeshift27015/marauder_rclone_generate_keys"
+            context: "rclone_generate_keys/"
+          - image: "makeshift27015/sonarr"
+            context: "sonarr/"
+          - image: "makeshift27015/traktarr"
+            context: "traktarr/"
 
     steps:
       - name: Checkout
@@ -45,4 +44,4 @@ jobs:
         with:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
           context: ${{ matrix.group.context }}
-          image: m${{ matrix.group.image }}
+          image: ${{ matrix.group.image }}
