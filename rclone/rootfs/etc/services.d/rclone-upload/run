@@ -139,8 +139,8 @@ while true; do
                 DEST=":union:"
                 # Copy everything to the mount first to ensure that it's all still available while we're uploading
                 LOG "Upload started with account $ACCOUNT"
-                DEBUG_LOG "rclone copy --progress --stats-one-line --stats 10s --files-from "$TMP_FILE" "$SOURCE" "$DEST" --drive-service-account-file "${ACCOUNT}" --drive-stop-on-upload-limit -v --buffer-size 16M --transfers 6 --use-mmap --low-level-retries 1 --multi-thread-cutoff 25M --multi-thread-streams 8 --no-update-modtime --drive-server-side-across-configs"
-                (rclone copy --progress --stats-one-line --stats 10s --files-from "$TMP_FILE" "$SOURCE" "$DEST" --drive-service-account-file "${ACCOUNT}" --drive-stop-on-upload-limit -v --buffer-size 16M --transfers 6 --use-mmap --low-level-retries 1 --multi-thread-cutoff 25M --multi-thread-streams 8 --no-update-modtime --drive-server-side-across-configs 2>&1 | grep -v "Free Space is not supported for upstream" | tee $TMP_LOG) &
+                DEBUG_LOG "rclone copy --files-from "$TMP_FILE" "$SOURCE" "$DEST" --drive-service-account-file "${ACCOUNT}" --drive-stop-on-upload-limit -v --buffer-size 16M --transfers 6 --use-mmap --low-level-retries 1 --multi-thread-cutoff 25M --multi-thread-streams 8 --no-update-modtime --drive-server-side-across-configs"
+                (rclone copy --files-from "$TMP_FILE" "$SOURCE" "$DEST" --drive-service-account-file "${ACCOUNT}" --drive-stop-on-upload-limit -v --buffer-size 16M --transfers 6 --use-mmap --low-level-retries 1 --multi-thread-cutoff 25M --multi-thread-streams 8 --no-update-modtime --drive-server-side-across-configs 2>&1 | grep -v "Free Space is not supported for upstream" | tee $TMP_LOG) &
                 wait $!
                 RCLONE_EXIT_CODE=$?
                 if [ "${RCLONE_EXIT_CODE}" -ne "0" ] ; then
