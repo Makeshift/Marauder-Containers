@@ -59,6 +59,10 @@ while true; do
         # Get a list of uploads adding up to our maximum size
         UPLOAD_LIST_TOTAL=$(rclone lsf -R -L --files-only --format "sp" --separator "    " "$SOURCE" --min-age $MIN_AGE)
         UPLOAD_LIST=$(echo "$UPLOAD_LIST_TOTAL" | dirsplit -n -s ${SIZE_LIMIT}G -T- 2>&1)
+        UPLOAD_LIST_SIZE_RAW=$(rclone size "$SOURCE" | grep size)
+        UPLOAD_LIST_SIZE=${UPLOAD_LIST_SIZE_RAW#Total size: }
+        UPLOAD_LIST_SIZE=${UPLOAD_LIST_SIZE%(*}
+        echo "We found a total of $UPLOAD_LIST_SIZE to upload."
         if echo "$UPLOAD_LIST" | grep "Too large object" > /dev/null; then
             # We found a file that's bigger than our maximum size - Only upload that file.
             LOG "We found a file larger than ${SIZE_LIMIT}GB in our upload list. Uploading only that file now."
