@@ -17,55 +17,31 @@ jobs:
   build:
     name: Build
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        group: 
+          - image: "makeshift27015/bazarr"
+            context: "bazarr/"
+          - image: "makeshift27015/marauder_gcloud_init"
+            context: "gcloud_init/"
+          - image: "makeshift27015/radarr"
+            context: "radarr/"
+          - image: "makeshift27015/rclone"
+            context: "rclone/"
+          - image: "makeshift27015/marauder_rclone_generate_keys"
+            context: "rclone_generate_keys/"
+          - image: "makeshift27015/sonarr"
+            context: "sonarr/"
+          - image: "makeshift27015/traktarr"
+            context: "traktarr/"
+
     steps:
       - name: Checkout
         uses: actions/checkout@v2
 
-      - name: Build bazarr
+      - name: Build ${{ matrix.group.image }}
         uses: ./.github/actions/build-and-push-container
         with:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-          context: bazarr/
-          image: makeshift27015/bazarr
-
-      - name: Build gcloud init
-        uses: ./.github/actions/build-and-push-container
-        with:
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-          context: gcloud_init/
-          image: makeshift27015/marauder_gcloud_init
-
-      - name: Build radarr
-        uses: ./.github/actions/build-and-push-container
-        with:
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-          context: radarr/
-          image: makeshift27015/radarr
-
-      - name: Build rclone
-        uses: ./.github/actions/build-and-push-container
-        with:
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-          context: rclone/
-          image: makeshift27015/rclone
-
-      - name: Build rclone generate keys
-        uses: ./.github/actions/build-and-push-container
-        with:
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-          context: rclone_generate_keys/
-          image: makeshift27015/marauder_rclone_generate_keys
-
-      - name: Build sonarr
-        uses: ./.github/actions/build-and-push-container
-        with:
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-          context: sonarr/
-          image: makeshift27015/sonarr
-
-      - name: Build traktarr
-        uses: ./.github/actions/build-and-push-container
-        with:
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-          context: traktarr/
-          image: makeshift27015/traktarr
+          context: ${{ matrix.group.context }}
+          image: m${{ matrix.group.image }}
