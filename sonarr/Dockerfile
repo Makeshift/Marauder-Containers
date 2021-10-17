@@ -1,3 +1,3 @@
-FROM linuxserver/sonarr:latest
+FROM linuxserver/sonarr:develop
 
 COPY 40-symlink-logs /etc/cont-init.d/
