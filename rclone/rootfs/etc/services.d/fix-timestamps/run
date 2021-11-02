@@ -4,6 +4,7 @@ set -o pipefail
 
 # This script checks for any timestamps in the future in the upload folder and fixes them
 #  so the upload script can run.
+echo "[fix-timestamps] Script running"
 
 _term() { 
   echo "Caught SIGTERM"
