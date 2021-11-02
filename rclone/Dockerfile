@@ -18,11 +18,10 @@ RUN apk --no-cache add --virtual .s6-build-deps curl && \
     tar xfz /tmp/s6-overlay.tar.gz -C / && \
     apk --no-cache del .s6-build-deps
 
-RUN apk --no-cache add --virtual .rclone-build-deps go git alpine-sdk && \
+RUN apk --no-cache add --virtual .rclone-build-deps unzip && \
     apk --no-cache add --virtual .rclone-run-deps ca-certificates fuse fuse-dev && \
     apk --no-cache add --virtual .run-deps findutils moreutils bash gettext cdrkit grep gawk && \
-    go get github.com/rclone/rclone && \
-    cp /go/bin/rclone /usr/sbin/ && \
+    curl https://rclone.org/install.sh | bash && \
     apk del .rclone-build-deps && \
     rm -rf /usr/lib/go /go /tmp/* /var/cache/apk/* /var/lib/apk/lists/*
 
