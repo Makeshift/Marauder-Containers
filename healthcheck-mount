@@ -1,6 +1,6 @@
 #!/usr/bin/with-contenv bash
 set -xe
 
-mount=${mount:-"/shared/merged"}
+MountPoint=${MountPoint:-"/shared/merged"}
 
-grep -qs "${mount} " /proc/mounts || exit 1
+grep -qs "${MountPoint} " /proc/mounts || exit 1
