@@ -1,0 +1,6 @@
+#!/usr/bin/with-contenv bash
+set -xe
+
+HEALTHCHECK_PORT=${HEALTHCHECK_PORT:-3000}
+
+curl --fail http://localhost:$HEALTHCHECK_PORT
