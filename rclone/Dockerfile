@@ -27,6 +27,6 @@ RUN apk --no-cache add --virtual .rclone-build-deps unzip && \
 
 COPY rootfs/ /
 
-RUN chmod +x /usr/sbin/*
+HEALTHCHECK --start-period=30s CMD /usr/sbin/healthcheck-mount
 
 ENTRYPOINT ["/init"]
