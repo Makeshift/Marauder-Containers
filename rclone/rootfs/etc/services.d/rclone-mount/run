@@ -16,6 +16,6 @@ PREFFIX="[services.d] [rclone-mount]-$(s6-basename ${0}):"
 # Clean up mount options
 MountCommands=$(echo ${MountCommands} | xargs echo -n)
 
-echo -e "${PREFFIX} ${Green}starting rclone mount $(date +%Y.%m.%d-%T)\n ${Yellow} /usr/sbin/rclone mount $MountCommands $RemotePath $MountPoint ${Color_Off}"
+echo -e "${PREFFIX} ${Green}starting rclone mount $(date +%Y.%m.%d-%T)\n ${Yellow} /usr/bin/rclone mount $MountCommands $RemotePath $MountPoint ${Color_Off}"
 
-/usr/sbin/rclone mount $MountCommands $RemotePath $MountPoint 
+/usr/bin/rclone mount $MountCommands $RemotePath $MountPoint 
