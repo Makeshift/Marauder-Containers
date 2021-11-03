@@ -30,7 +30,7 @@ runs:
         username: ${{ inputs.username }}
         password: ${{ inputs.password }}
 
-    - uses: bluwy/substitute-string-actions@v1
+    - uses: bluwy/substitute-string-action@v1
       id: dockerfile
       with:
         _input-text: ${{ inputs.dockerfile }}
