@@ -40,9 +40,6 @@ jobs:
 
           - image: "makeshift27015/traktarr"
             dockerfile: "traktarr/Dockerfile"
-
-          - image: "makeshift27015/headphones"
-            dockerfile: "Dockerfile-headphones"
           
           - image: "makeshift27015/headphones"
             dockerfile: "headphones.Dockerfile"
