@@ -5,10 +5,9 @@ ENV GOPATH="/go" \
     MountPoint="/shared/merged" \
     RemotePath="union:" \
     UnmountCommands="-u -z" \
-    CacheFolderSuffix="" \
     ItemsPerUpload=100 \
-    CacheSizePerMountGb=10 \
-    MaxGbPerUpload=25
+    MaxGbPerUpload=25 \
+    S6_BEHAVIOUR_IF_STAGE2_FAILS=2
 
 RUN apk --no-cache upgrade
 
