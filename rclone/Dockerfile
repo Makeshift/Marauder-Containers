@@ -26,6 +26,7 @@ RUN apk --no-cache add --virtual .rclone-build-deps unzip curl && \
     rm -rf /usr/lib/go /go /tmp/* /var/cache/apk/* /var/lib/apk/lists/*
 
 COPY rootfs/ /
+COPY ../healthcheck-mount /usr/sbin/
 
 HEALTHCHECK --start-period=30s CMD /usr/sbin/healthcheck-mount
 
