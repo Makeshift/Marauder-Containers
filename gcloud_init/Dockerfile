@@ -8,6 +8,6 @@ ENV PROJECT_NAME_PREFIX="marauder-" \
     SA_EMAIL_PREFIX="marauder"
 
 RUN apk --no-cache add bash
-COPY generate.sh ./
+COPY gcloud_init/generate.sh ./
 
 CMD ./generate.sh

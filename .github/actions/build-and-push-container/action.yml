@@ -5,6 +5,9 @@ inputs:
   password:
     description: Docker Hub password or token
     required: true
+  dockerfile:
+    description: Path to dockerfile
+    default: inputs.context/Dockerfile
   context:
     description: Dockerfile context
     default: .
@@ -21,17 +24,23 @@ runs:
   steps:
     - name: Inject slug/short variables
       uses: rlespinasse/github-slug-action@v3.x
-
     - name: Log in to Docker Hub
       uses: docker/login-action@v1.10.0
       with:
         username: ${{ inputs.username }}
         password: ${{ inputs.password }}
 
+    - uses: bluwy/substitute-string-actions@v1
+      id: dockerfile
+      with:
+        _input-text: ${{ inputs.dockerfile }}
+        "inputs.context": ${{ inputs.context }}
+
     - name: Build and push Docker image
       uses: docker/build-push-action@v2.7.0
       with:
         context: ${{ inputs.context }}
+        file: ${{ steps.dockerfile.outputs.result }}
         push: true
         tags: "${{ inputs.image }}:${{ env.GITHUB_REF_SLUG_URL == inputs.latest_tag_branch && 'latest' || env.GITHUB_REF_SLUG_URL }},${{ inputs.image }}:${{ env.GITHUB_SHA_SHORT }}"
         cache-from: "${{ inputs.image }}:${{ env.GITHUB_REF_SLUG_URL == inputs.latest_tag_branch && 'latest' || env.GITHUB_REF_SLUG_URL }}"

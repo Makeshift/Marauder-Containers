@@ -2,3 +2,4 @@
 set -xe
 
 grep -qs "/shared/merged " /proc/mounts || exit 1
+
