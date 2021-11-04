@@ -6,7 +6,7 @@ set -o pipefail
 #  so the upload script can run.
 
 _echo() {
-  echo "[fix-timestamps] $@"
+  echo "[fix-timestamps] $*"
 }
 
 _echo "Script running"
@@ -22,14 +22,16 @@ PREFIX=Media/
 SOURCE=/shared/separate/$PREFIX
 
 function changeTimestamp() {
-  local path=$1
-  local fromTimestamp=$(date -r $path)
+  local path
+  local fromTimestamp
+  path=$1
+  fromTimestamp=$(date -r "$path")
   _echo "Changing $path timestamp of $fromTimestamp to current time"
-  touch $1
+  touch "$path"
 }
 export -f changeTimestamp
 
-cd "$SOURCE"
+cd "$SOURCE" || exit
 
 while true; do
   touch /tmp/now
