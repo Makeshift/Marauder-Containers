@@ -29,7 +29,7 @@ function changeTimestamp() {
   _echo "Changing $path timestamp of $fromTimestamp to current time"
   touch "$path"
 }
-export -f changeTimestamp
+export -f changeTimestamp _echo
 
 cd "$SOURCE" || exit
 
