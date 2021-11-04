@@ -4,10 +4,15 @@ set -o pipefail
 
 # This script checks for any timestamps in the future in the upload folder and fixes them
 #  so the upload script can run.
-echo "[fix-timestamps] Script running"
+
+_echo() {
+  echo "[fix-timestamps] $@"
+}
+
+_echo "Script running"
 
 _term() { 
-  echo "Caught SIGTERM"
+  _echo "Caught SIGTERM"
   exit 0
 }
 
@@ -19,7 +24,7 @@ SOURCE=/shared/separate/$PREFIX
 function changeTimestamp() {
   local path=$1
   local fromTimestamp=$(date -r $path)
-  echo "[fix-timestamps] Changing $path timestamp of $fromTimestamp to current time"
+  _echo "Changing $path timestamp of $fromTimestamp to current time"
   touch $1
 }
 export -f changeTimestamp
@@ -28,6 +33,7 @@ cd "$SOURCE"
 
 while true; do
   touch /tmp/now
+  _echo "Checking for files that appear to be newer than $(date -r /tmp/now)"
   find ~+ -newer /tmp/now -exec bash -c 'changeTimestamp "$0"' {} +
   sleep 600
 done

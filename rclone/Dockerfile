@@ -19,7 +19,7 @@ RUN apk --no-cache add --virtual .s6-build-deps curl && \
 
 RUN apk --no-cache add --virtual .rclone-build-deps unzip curl && \
     apk --no-cache add --virtual .rclone-run-deps ca-certificates fuse fuse-dev && \
-    apk --no-cache add --virtual .run-deps findutils moreutils bash gettext cdrkit grep gawk && \
+    apk --no-cache add --virtual .run-deps findutils moreutils coreutils bash gettext cdrkit grep gawk && \
     curl https://rclone.org/install.sh | bash && \
     apk del .rclone-build-deps && \
     rm -rf /usr/lib/go /go /tmp/* /var/cache/apk/* /var/lib/apk/lists/*
