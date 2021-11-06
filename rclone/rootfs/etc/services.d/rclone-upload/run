@@ -13,6 +13,7 @@ SINGLE_UPLOAD=$1
 PREFIX=Media/
 SOURCE=/shared/separate/$PREFIX
 MOUNT_LOCATION=/shared/merged/
+DOWNLOAD_LOCATION=downloads
 MOUNT_NAME_PREFIX=gdrive_upload_crypt_
 RCLONE_HOST="127.0.0.1"
 RCLONE_PORT="5572" # I should probably set this from an env var
@@ -174,6 +175,11 @@ while true; do
                 # If we get here, we can assume we've successfully copied and can kill the loop
                 DEBUG_LOG "Upload complete - Setting global account counter to the current counter $CURRENT_ACCOUNT_NUM"
                 GLOBAL_ACCOUNT_NUM=$CURRENT_ACCOUNT_NUM
+                DEBUG_LOG "Refreshing Rclone upload dir VFS"
+                DEBUG_LOG $(curl -fs -X POST "admin:admin@${RCLONE_HOST}:${RCLONE_PORT}/vfs/forget?dir=${DOWNLOAD_LOCATION}")
+                sleep 1
+                DEBUG_LOG $(curl -fs -X POST "admin:admin@${RCLONE_HOST}:${RCLONE_PORT}/vfs/refresh?dir=${DOWNLOAD_LOCATION}&recursive=true")
+                sleep 1
                 break
             done
             LOG "Upload complete"
