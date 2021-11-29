@@ -31,6 +31,9 @@ UpstreamList=${UpstreamList#"upstreams = "}
 
 rc="rclone rc --rc-addr=127.0.0.1:5572 --rc-user=admin --rc-pass=admin"
 
+# This section switches out the service account for the mount.
+# New uploads are uploaded via rclone-upload, but existing files that are being edited (eg. by unmanic) are uploaded via the mount
+# So we will occasionally get userRateLimitExceeded by the mount too.
 function parseRcloneLog() {
   local line="$@"
   _echo "${line}"
@@ -39,7 +42,7 @@ function parseRcloneLog() {
     while IFS= read -r remote; do
       newServiceAccount=$(find /service_accounts/*.json -type f | shuf -n 1)
       _echo "${Red}Rclone claims userRateLimitExceeded, switching to service account ${newServiceAccount} for remote ${remote}${Color_Off}"
-      $rc set ${remote}: -o service_account_file=${newServiceAccount}
+      $rc backend/command command=set fs=${remote}: -o service_account_file=${newServiceAccount}
     done <<< "$gdriveRemoteList"
     
   fi
