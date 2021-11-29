@@ -14,7 +14,7 @@ source /etc/colors.sh
 PREFIX="[services.d] [rclone-mount]-$(s6-basename ${0}):"
 
 _echo() {
-  echo -e "${PREFIX} $@" | tee /run.log
+  echo -e "${PREFIX} $@" | tee /logs/run.log
 }
 
 
