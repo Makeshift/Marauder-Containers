@@ -29,7 +29,7 @@ _echo "${Green}starting rclone mount $(date +%Y.%m.%d-%T)\n ${Yellow} ${RunComma
 UpstreamList=$(grep upstreams /root/.config/rclone/rclone.conf)
 UpstreamList=${UpstreamList#"upstreams = "}
 
-rc="rclone rc --rc-addr=127.0.0.1:5570 --rc-user=admin --rc-pass=admin"
+rc="rclone rc --rc-addr=127.0.0.1:5572 --rc-user=admin --rc-pass=admin"
 
 function parseRcloneLog() {
   local line="$@"
