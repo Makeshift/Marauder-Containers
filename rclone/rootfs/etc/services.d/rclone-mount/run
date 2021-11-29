@@ -51,5 +51,5 @@ function parseRcloneLog() {
     #$rc set ${RemotePath}: -o upstreams=""
   fi
 }
-export -f parseRcloneLog
+export -f parseRcloneLog _echo Red Color_Off
 $RunCommand 2>&1 | xargs -0 -d '\n' -I {} bash -c 'parseRcloneLog "{}"'
