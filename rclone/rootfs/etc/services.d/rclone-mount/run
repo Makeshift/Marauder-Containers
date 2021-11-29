@@ -52,4 +52,4 @@ function parseRcloneLog() {
   fi
 }
 export -f parseRcloneLog
-$RunCommand 2>&1 | xargs -0 -I {} bash -c 'parseRcloneLog "{}"'
+$RunCommand 2>&1 | xargs -0 -d '\n' -I {} bash -c 'parseRcloneLog "{}"'
