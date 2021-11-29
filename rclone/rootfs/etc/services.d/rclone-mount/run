@@ -11,11 +11,42 @@ trap _term SIGTERM
 
 source /etc/colors.sh
 
-PREFFIX="[services.d] [rclone-mount]-$(s6-basename ${0}):"
+PREFIX="[services.d] [rclone-mount]-$(s6-basename ${0}):"
 
-# Clean up mount options
+_echo() {
+  echo -e "${PREFIX} $@" | tee /run.log
+}
+
+
+BaseServiceAccount=$(find /service_accounts/*.json -type f | shuf -n 1)
+MountCommands="${MountCommands} --drive-service-account-file $BaseServiceAccount"
+
 MountCommands=$(echo ${MountCommands} | xargs echo -n)
+RunCommand="/usr/bin/rclone mount $MountCommands $RemotePath $MountPoint"
 
-echo -e "${PREFFIX} ${Green}starting rclone mount $(date +%Y.%m.%d-%T)\n ${Yellow} /usr/bin/rclone mount $MountCommands $RemotePath $MountPoint ${Color_Off}"
+_echo "${Green}starting rclone mount $(date +%Y.%m.%d-%T)\n ${Yellow} ${RunCommand} ${Color_Off}"
 
-/usr/bin/rclone mount $MountCommands $RemotePath $MountPoint 
+UpstreamList=$(grep upstreams /root/.config/rclone/rclone.conf)
+UpstreamList=${UpstreamList#"upstreams = "}
+
+rc="rclone rc --rc-addr=127.0.0.1:5570 --rc-user=admin --rc-pass=admin"
+
+function parseRcloneLog() {
+  local line="$@"
+  _echo "${line}"
+  if echo $line | grep "userRateLimitExceeded" > /dev/null; then
+    gdriveRemoteList=$($rc config/dump | jq -r 'to_entries | (.[] | select(.value.type == "drive")) | .key')
+    while IFS= read -r remote; do
+      newServiceAccount=$(find /service_accounts/*.json -type f | shuf -n 1)
+      _echo "${Red}Rclone claims userRateLimitExceeded, switching to service account ${newServiceAccount} for remote ${remote}${Color_Off}"
+      $rc set ${remote}: -o service_account_file=${newServiceAccount}
+    done <<< "$gdriveRemoteList"
+    
+  fi
+  if echo $line | grep "teamDriveFileLimitExceeded" > /dev/null; then
+  _echo "${Red}Rclone claims teamDriveFileLimitExceeded. PANIC!${Color_Off}"
+    #$rc set ${RemotePath}: -o upstreams=""
+  fi
+}
+export -f parseRcloneLog
+$RunCommand 2>&1 | xargs -0 -I {} bash -c 'parseRcloneLog "{}"'
