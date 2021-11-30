@@ -3,4 +3,5 @@ cd /config/.unmanic/logs && \
 rm -f tornado.log* unmanic.log* && \
 ln -sf /proc/1/fd/1 tornado.log && \
 ln -sf /proc/1/fd/1 unmanic.log && \
-chown -h 65534:65534 tornado.log unmanic.log
+chown -h $PUID:$PGID tornado.log unmanic.log && \
+chmod 777 tornado.log unmanic.log
