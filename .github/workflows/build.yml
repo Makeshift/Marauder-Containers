@@ -63,7 +63,7 @@ jobs:
             dockerfile: "transmission.Dockerfile"
           
           - image: "makeshift27015/unmanic"
-            dockerfile: "unmanic.Dockerfile"
+            dockerfile: "unmanic/Dockerfile"
 
     steps:
       - name: Checkout

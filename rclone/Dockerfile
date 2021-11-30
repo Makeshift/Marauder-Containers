@@ -9,8 +9,6 @@ ENV GOPATH="/go" \
     MaxGbPerUpload=25 \
     S6_BEHAVIOUR_IF_STAGE2_FAILS=2
 
-RUN apk --no-cache upgrade
-
 RUN apk --no-cache add --virtual .s6-build-deps curl && \
     curl -o /tmp/s6-overlay.tar.gz -L \
     "https://github.com/just-containers/s6-overlay/releases/download/v1.22.1.0/s6-overlay-amd64.tar.gz" && \
