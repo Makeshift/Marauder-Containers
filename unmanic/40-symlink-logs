@@ -1,7 +1,0 @@
-#!/usr/bin/with-contenv bash
-mkdir -p /config/.unmanic/logs
-cd /config/.unmanic/logs
-rm -f tornado.log* unmanic.log*
-ln -sf /proc/1/fd/1 tornado.log 
-ln -sf /proc/1/fd/1 unmanic.log
-chmod 777 tornado.log unmanic.log

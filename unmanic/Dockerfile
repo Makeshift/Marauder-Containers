@@ -1,6 +1,6 @@
 FROM josh5/unmanic
 
-COPY unmanic/40-symlink-logs /etc/cont-init.d/
+COPY unmanic/tail-logs /etc/services.d/tail-logs/run
 COPY healthcheck-mount /etc/cont-init.d/00-healthcheck-mount
 COPY healthcheck-web /etc/sbin/
 
