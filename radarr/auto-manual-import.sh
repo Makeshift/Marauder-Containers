@@ -5,7 +5,7 @@
 # (Just like the normal import would)
 
 _echo() {
-  echo "[auto-manual-import] $*"
+  echo "[services.d] [auto-manual-import]-$(s6-basename "${0}"): $*"
 }
 
 _term() { 
@@ -91,7 +91,5 @@ function go() {
 }
 
 while [ "$DO_AUTO_MANUAL_IMPORT" = "true" ]; do
-  (go || _echo "Failed")
-  _echo "Sleeping for $HOW_OFTEN_IN_SECONDS"
-  sleep $HOW_OFTEN_IN_SECONDS
+  (go && _echo "Sleeping for $HOW_OFTEN_IN_SECONDS" && sleep $HOW_OFTEN_IN_SECONDS)
 done
