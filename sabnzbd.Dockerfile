@@ -1,4 +1,4 @@
-FROM linuxserver/sabnzbd
+FROM linuxserver/sabnzbd:3.5.0-unstable
 
 COPY healthcheck-web /etc/sbin/
 
