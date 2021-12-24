@@ -42,15 +42,15 @@ function go() {
     --max-time 1800 \
     "http://${HOST}:${PORT}/api/v3/manualimport")
   if [ "$?" -ne 0 ] || [[ ${HTTP_CODE} -lt 200 || ${HTTP_CODE} -gt 299 ]]; then
-    _echo "We failed to get data from the Sonarr API with HTTP $HTTP_CODE. Here's what it returned:"
     _echo "$(cat /tmp/data.json)"
+     _echo "We failed to get data from the Sonarr API with HTTP $HTTP_CODE. Here's what it returned ^"
     return 1
   fi
   
   files_waiting_count=$(grep seriesId /tmp/data.json | wc -l)
   if [ "$?" -ne 0 ]; then
-    _echo "We failed to get the list of files when parsing data:"
     _echo "$(cat /tmp/data.json)"
+    _echo "We failed to get the list of files when parsing data ^"
     return 1
   fi
   _echo "Got $files_waiting_count files waiting in Sonarr's import folder."
@@ -65,15 +65,15 @@ function go() {
     language: .language
   }]' /tmp/data.json > /tmp/no_rejections.json
   if [ "$?" -ne 0 ]; then
-    _echo "We failed to filter rejections with data:"
     _echo "$(cat /tmp/data.json)"
+    _echo "We failed to filter rejections with data ^"
     return 1
   fi
   
   files_not_rejected_count=$(grep seriesId /tmp/no_rejections.json | wc -l)
   if [ "$?" -ne 0 ]; then
-    _echo "We failed to get the count of unrejected files when parsing data:"
     _echo "$(cat /tmp/no_rejections.json)"
+    _echo "We failed to get the count of unrejected files when parsing data ^"
     return 1
   fi
   _echo "Found $files_not_rejected_count episodes that have not been imported that should have been. Importing now..."
@@ -86,10 +86,9 @@ function go() {
       -d @/tmp/import-list.json http://${HOST}:${PORT}/api/v3/command
   )
   if [ "$?" -ne 0 ] || [[ ${HTTP_CODE} -lt 200 || ${HTTP_CODE} -gt 299 ]]; then
-    _echo "Sonarr rejected our import request with a HTTP $HTTP_CODE with data:"
     _echo "$(cat /tmp/no_rejections.json)"
-    _echo "and response from Sonarr:"
     _echo "$(cat /tmp/import_out.json)"
+    _echo "Sonarr rejected our import request with a HTTP $HTTP_CODE with above data and response ^"
     return 1
   fi
 
