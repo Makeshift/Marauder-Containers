@@ -55,7 +55,7 @@ function go() {
   fi
   _echo "Got $files_waiting_count files waiting in Sonarr's import folder."
 
-  jq '[.[] | select(.rejections | length == 0)] | [.[] | {
+  error=$(jq '[.[] | select(.rejections | length == 0)] | [.[] | try {
     path: .path,
     folderName: .folderName,
     seriesId: .series.id,
@@ -63,10 +63,11 @@ function go() {
     releaseGroup: .releaseGroup,
     quality: .quality,
     language: .language
-  }]' /tmp/data.json > /tmp/no_rejections.json
+  }]' /tmp/data.json > /tmp/no_rejections.json)
   if [ "$?" -ne 0 ]; then
     _echo "$(cat /tmp/data.json)"
     _echo "We failed to filter rejections with data ^"
+	_echo "$error"
     return 1
   fi
   
@@ -78,7 +79,7 @@ function go() {
   fi
   _echo "Found $files_not_rejected_count episodes that have not been imported that should have been. Importing now..."
 
-  jq '{name: "ManualImport", importMode:"move", files: [.[]]}' /tmp/no_rejections.json > /tmp/import-list.json
+  error=$(jq '{name: "ManualImport", importMode:"move", files: [.[]]}' /tmp/no_rejections.json > /tmp/import-list.json)
   HTTP_CODE=$(curl -s --output /tmp/import_out.json --write-out "%{http_code}" -X POST \
       -H "x-api-key: ${API_KEY}" \
       -H "Content-Type: application/json" \
