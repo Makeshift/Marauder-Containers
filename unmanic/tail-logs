@@ -1,3 +1,0 @@
-#!/usr/bin/with-contenv bash
-sleep 5
-tail -f /config/.unmanic/logs/unmanic.log
