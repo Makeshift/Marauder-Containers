@@ -61,9 +61,6 @@ jobs:
           
           - image: "makeshift27015/transmission"
             dockerfile: "transmission.Dockerfile"
-          
-          - image: "makeshift27015/unmanic"
-            dockerfile: "unmanic/Dockerfile"
 
     steps:
       - name: Checkout
