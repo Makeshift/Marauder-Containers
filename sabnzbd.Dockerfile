@@ -4,5 +4,5 @@ COPY healthcheck-web /etc/sbin/
 
 ENV HEALTHCHECK_PORT=8080
 
-RUN apt-get update && apt-get install curl && rm -rf /var/lib/apt/lists/*
+RUN apk add --no-cache curl
 HEALTHCHECK --start-period=10s CMD /etc/sbin/healthcheck-web
