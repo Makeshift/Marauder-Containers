@@ -21,7 +21,7 @@ jobs:
       matrix:
         group: 
           - image: "makeshift27015/bazarr"
-            dockerfile: "bazarr/Dockerfile"
+            dockerfile: "bazarr.Dockerfile"
 
           - image: "makeshift27015/marauder_gcloud_init"
             dockerfile: "gcloud_init/Dockerfile"

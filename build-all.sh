@@ -1,7 +1,7 @@
 #!/bin/bash
 set -ex
 
-docker build -t makeshift27015/bazarr -f bazarr/Dockerfile .
+docker build -t makeshift27015/bazarr -f bazarr.Dockerfile .
 
 docker build -t makeshift27015/marauder_gcloud_init -f gcloud_init/Dockerfile .
 

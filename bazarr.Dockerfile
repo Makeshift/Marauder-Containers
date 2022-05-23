@@ -1,10 +1,9 @@
 FROM linuxserver/bazarr
 
-COPY bazarr/change_timeout.sh /etc/cont-init.d/10-change-timeout
 COPY healthcheck-mount /etc/cont-init.d/00-healthcheck-mount
 COPY healthcheck-web /etc/sbin/
 
-RUN apk add --no-cache sed findutils curl
+RUN apk add --no-cache curl
 
 ENV S6_BEHAVIOUR_IF_STAGE2_FAILS=2 \
     HEALTHCHECK_PORT=6767
