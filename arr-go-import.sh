@@ -75,14 +75,14 @@ function go() {
     return 1
   fi
 
-  if [ "$files_waiting_count" -eq 0 ]; then
+  if [ "$files_not_rejected_count" -eq 0 ]; then
     _echo "No files waiting."
     return 0
   else
-    _echo "Found $files_not_rejected_count episodes that have not been imported that should have been. Importing now..."
+    _echo "Found $files_not_rejected_count files that have not been imported that should have been. Importing now..."
   fi
 
-  error=$(jq '{name: "ManualImport", importMode:"move", files: [.[]]}' /tmp/no_rejections.json >/tmp/import_list.json)
+  error=$(jq 'del(..|nulls) | {name: "ManualImport", importMode:"move", files: [.[]]}' /tmp/no_rejections.json >/tmp/import_list.json)
   if [ "$?" -ne 0 ]; then
     head /tmp/no_rejections.json
     _echo "^/tmp/no_rejections.json"
