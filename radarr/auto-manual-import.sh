@@ -6,7 +6,7 @@
 if $DEBUG; then set -x; fi
 
 # Exports all vars
-set -b
+set -a
 
 PROGRAM_NAME="Radarr"
 PROGRAM_NAME_LOWER=${PROGRAM_NAME,,}
