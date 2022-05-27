@@ -50,7 +50,14 @@ function go() {
     _echo "We failed to get the list of files when parsing data (possibly truncated) /tmp/data.json ^"
     return 1
   fi
-  _echo "Got $files_waiting_count files waiting in $PROGRAM_NAME's import folder."
+  
+
+  if [ "$files_waiting_count" -eq 0 ]; then
+    _echo "No files waiting."
+    return 0
+  else
+    _echo "Got $files_waiting_count files waiting in $PROGRAM_NAME's import folder."
+  fi
 
   error=$(eval $JQ_FILTER_REJECTIONS)
   if [ "$?" -ne 0 ]; then
@@ -67,7 +74,13 @@ function go() {
     _echo "We failed to get the count of unrejected files when parsing data (possibly truncated) /tmp/no_rejections.json ^"
     return 1
   fi
-  _echo "Found $files_not_rejected_count episodes that have not been imported that should have been. Importing now..."
+
+  if [ "$files_waiting_count" -eq 0 ]; then
+    _echo "No files waiting."
+    return 0
+  else
+    _echo "Found $files_not_rejected_count episodes that have not been imported that should have been. Importing now..."
+  fi
 
   error=$(jq '{name: "ManualImport", importMode:"move", files: [.[]]}' /tmp/no_rejections.json >/tmp/import_list.json)
   if [ "$?" -ne 0 ]; then
