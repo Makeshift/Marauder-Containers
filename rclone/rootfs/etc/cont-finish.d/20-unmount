@@ -1,5 +1,7 @@
 #!/usr/bin/with-contenv sh
 
+if $DEBUG; then set -x; fi
+
 source /etc/colors.sh
 
 PREFFIX="[cont-finish.d] $(s6-basename ${0}):"

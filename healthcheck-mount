@@ -1,5 +1,7 @@
 #!/usr/bin/with-contenv bash
-set -xe
+set -e
+
+if $DEBUG; then set -x; fi
 
 MountPoint=${MountPoint:-"/shared/merged"}
 

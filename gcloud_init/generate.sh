@@ -1,5 +1,7 @@
 #!/bin/bash
-set +ex
+set +e
+
+if $DEBUG; then set -x; fi
 
 Cyan='\033[0;36m'         # Cyan
 Yellow='\033[0;33m'       # Yellow

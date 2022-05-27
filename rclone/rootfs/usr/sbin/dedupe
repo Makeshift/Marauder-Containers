@@ -1,5 +1,8 @@
 #!/bin/bash
-set +ex
+set +e
+
+if $DEBUG; then set -x; fi
+
 SERVICE_ACCOUNT_PATH=/service_accounts
 TEAM_DRIVES_COUNT=$(printf "%s\n" ${rclone_team_drive_ids} | wc -l)
 SERVICE_ACCOUNTS=$(find "${SERVICE_ACCOUNT_PATH}" -type f -name "*.json")

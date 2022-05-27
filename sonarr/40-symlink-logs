@@ -1,4 +1,7 @@
 #!/usr/bin/with-contenv bash
+
+if $DEBUG; then set -x; fi
+
 cd /config/logs && \
 rm -f sonarr.txt sonarr.debug.txt sonarr.trace.txt && \
 ln -sf /proc/1/fd/1 sonarr.txt && \

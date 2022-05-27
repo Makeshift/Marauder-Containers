@@ -1,5 +1,7 @@
 #!/bin/bash
 
+if $DEBUG; then set -x; fi
+
 if [ ! -f "/root/.config/rclone/rclone.conf" ]; then
     echo Conf file does not exist, generating using env vars
     echo If this errors, you should have used docker-compose to start this script, or ran exec while the container was running!

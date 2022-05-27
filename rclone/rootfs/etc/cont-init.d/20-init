@@ -2,6 +2,8 @@
 set -a
 source /etc/colors.sh
 
+if $DEBUG; then set -x; fi
+
 PREFFIX="[cont-init.d] $(s6-basename ${0}):"
 
 if [ -z "$SECRETS_SET" ]; then 

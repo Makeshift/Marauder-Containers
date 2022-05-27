@@ -1,7 +1,5 @@
 #!/usr/bin/with-contenv bash
 
-set -x
-
 # This sets the vars for the "generic" auto-import script that works with Sonarr/Radarr and anything
 #  based on their codebase.
 
@@ -32,6 +30,8 @@ AUTO_MANUAL_IMPORT_DIR=${AUTO_MANUAL_IMPORT_DIR:-$DEFAULT_AUTO_MANUAL_IMPORT_DIR
 # I'm not sure why, probably something to do with disk caching that I haven't tracked down yet
 # So this script runs the "Manual Import" feature and imports anything that doesn't have errors
 # (Just like the normal import would)
+
+if $DEBUG; then set -x; fi
 
 _echo() {
   echo "[services.d] [auto-manual-import]-$(s6-basename "${0}")-($(date +"%Y-%m-%d %T")): $*"

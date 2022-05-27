@@ -4,6 +4,8 @@
 # So this script runs the "Manual Import" feature and imports anything that doesn't have errors
 # (Just like the normal import would)
 
+if $DEBUG; then set -x; fi
+
 _echo() {
   echo "[services.d] [auto-manual-import]-$(s6-basename "${0}"): $*"
 }

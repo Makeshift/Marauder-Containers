@@ -1,5 +1,7 @@
 #!/usr/bin/with-contenv sh
 
+if $DEBUG; then set -x; fi
+
 fusermount -uz $MountPoint || true
 umount $MountPoint || true
 rm -r $MountPoint
