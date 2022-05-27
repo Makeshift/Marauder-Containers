@@ -31,4 +31,4 @@ PORT=8989
 API_KEY=$(grep ApiKey /config/config.xml | cut -d ">" -f2 | cut -d "<" -f1)
 AUTO_MANUAL_IMPORT_DIR=${AUTO_MANUAL_IMPORT_DIR:-$DEFAULT_AUTO_MANUAL_IMPORT_DIR}
 
-"/etc/sbin/arr-go-import.sh"
+source /etc/sbin/arr-go-import.sh
