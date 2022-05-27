@@ -34,9 +34,10 @@ function go() {
     -H "x-api-key: ${API_KEY}" \
     --max-time ${MAX_WAIT_TIME_FOR_HTTP_REQ_IN_SECONDS} \
     "http://${HOST}:${PORT}/api/v3/manualimport")
-  if [ "$?" -ne 0 ] || [[ ${HTTP_CODE} -lt 200 || ${HTTP_CODE} -gt 299 ]]; then
+  EXIT_CODE="$?"
+  if [ "$EXIT_CODE" -ne 0 ] || [[ ${HTTP_CODE} -lt 200 || ${HTTP_CODE} -gt 299 ]]; then
     head /tmp/data.json
-    _echo "We failed to get data from the $PROGRAM_NAME API with HTTP $HTTP_CODE. Here's what it returned (Possibly truncated) /tmp/data.json ^"
+    _echo "We failed to get data from the $PROGRAM_NAME API with HTTP code $HTTP_CODE and exit code $EXIT_CODE. Here's what it returned (Possibly truncated) /tmp/data.json ^"
     _echo "We're going to wait for a minute and then try again"
     sleep 60
     go
@@ -86,12 +87,13 @@ function go() {
       --max-time ${MAX_WAIT_TIME_FOR_HTTP_REQ_IN_SECONDS} \
       -d @/tmp/import_list.json http://${HOST}:${PORT}/api/v3/command
   )
-  if [ "$?" -ne 0 ] || [[ ${HTTP_CODE} -lt 200 || ${HTTP_CODE} -gt 299 ]]; then
+  EXIT_CODE="$?"
+  if [ "$EXIT_CODE" -ne 0 ] || [[ ${HTTP_CODE} -lt 200 || ${HTTP_CODE} -gt 299 ]]; then
     head /tmp/no_rejections.json
     _echo "^/tmp/no_rejections.json"
     head /tmp/import_out.json
     _echo "^/tmp/import_out.json"
-    _echo "$PROGRAM_NAME rejected our import request with a HTTP $HTTP_CODE with above data and response ^"
+    _echo "$PROGRAM_NAME rejected our import request with a HTTP $HTTP_CODE and exit code $EXIT_CODE with above data and response ^"
     return 1
   fi
 
