@@ -3,6 +3,11 @@
 # This sets the vars for the "generic" auto-import script that works with Sonarr/Radarr and anything
 #  based on their codebase.
 
+if $DEBUG; then set -x; fi
+
+# Exports all vars
+set -b
+
 PROGRAM_NAME="Sonarr"
 PROGRAM_NAME_LOWER=${PROGRAM_NAME,,}
 DEFAULT_AUTO_MANUAL_IMPORT_DIR="/shared/merged/downloads/sabnzbd/$PROGRAM_NAME_LOWER/"
