@@ -1,5 +1,7 @@
 #!/usr/bin/with-contenv bash
 
+set -x
+
 # This sets the vars for the "generic" auto-import script that works with Sonarr/Radarr and anything
 #  based on their codebase.
 
@@ -7,6 +9,7 @@ PROGRAM_NAME="Sonarr"
 PROGRAM_NAME_LOWER=${PROGRAM_NAME,,}
 DEFAULT_AUTO_MANUAL_IMPORT_DIR="/shared/merged/downloads/sabnzbd/$PROGRAM_NAME_LOWER/"
 FILES_WAITING_GREP="grep seriesId /tmp/data.json | wc -l"
+FILES_NOT_REJECTED_GREP="grep seriesId /tmp/no_rejections.json | wc -l"
 JQ_FILTER_REJECTIONS="jq '[.[] | select(.rejections | length == 0)] | [.[] | try {
     path: .path,
     folderName: .folderName,
@@ -18,6 +21,7 @@ JQ_FILTER_REJECTIONS="jq '[.[] | select(.rejections | length == 0)] | [.[] | try
   }]' /tmp/data.json >/tmp/no_rejections.json"
 HOW_OFTEN_IN_MINUTES=${HOW_OFTEN_IN_MINUTES-60}
 HOW_OFTEN_IN_SECONDS=$((HOW_OFTEN_IN_MINUTES * 60))
+MAX_WAIT_TIME_FOR_HTTP_REQ_IN_SECONDS=1800
 
 HOST=localhost
 PORT=8989
@@ -54,57 +58,67 @@ function go() {
     --data-urlencode "folder=${AUTO_MANUAL_IMPORT_DIR}" \
     --data-urlencode "filterExistingFiles=true" \
     -H "x-api-key: ${API_KEY}" \
-    --max-time 1800 \
+    --max-time ${MAX_WAIT_TIME_FOR_HTTP_REQ_IN_SECONDS} \
     "http://${HOST}:${PORT}/api/v3/manualimport")
   if [ "$?" -ne 0 ] || [[ ${HTTP_CODE} -lt 200 || ${HTTP_CODE} -gt 299 ]]; then
-    cat /tmp/data.json
-    _echo "We failed to get data from the $PROGRAM_NAME API with HTTP $HTTP_CODE. Here's what it returned ^"
+    head /tmp/data.json
+    _echo "We failed to get data from the $PROGRAM_NAME API with HTTP $HTTP_CODE. Here's what it returned (Possibly truncated) /tmp/data.json ^"
     _echo "We're going to wait for a minute and then try again"
     sleep 60
-    go()
+    go
     return $?
   fi
 
-  files_waiting_count=$()
+  files_waiting_count=$(eval $FILES_WAITING_GREP)
   if [ "$?" -ne 0 ]; then
-    _echo "$(cat /tmp/data.json)"
-    _echo "We failed to get the list of files when parsing data ^"
+    head /tmp/data.json
+    _echo "We failed to get the list of files when parsing data (possibly truncated) /tmp/data.json ^"
     return 1
   fi
   _echo "Got $files_waiting_count files waiting in $PROGRAM_NAME's import folder."
 
   error=$(eval $JQ_FILTER_REJECTIONS)
   if [ "$?" -ne 0 ]; then
-    cat /tmp/data.json
-    _echo "We failed to filter rejections with data ^"
+    head /tmp/data.json
+    _echo "We failed to filter rejections with data (possibly truncated) /tmp/data.json ^"
     _echo "$error"
+    _echo "^jq output"
     return 1
   fi
 
-  files_not_rejected_count=$(eval $FILES_WAITING_GREP)
+  files_not_rejected_count=$(eval $FILES_NOT_REJECTED_GREP)
   if [ "$?" -ne 0 ]; then
-    cat /tmp/no_rejections.json
-    _echo "We failed to get the count of unrejected files when parsing data ^"
+    head /tmp/no_rejections.json
+    _echo "We failed to get the count of unrejected files when parsing data (possibly truncated) /tmp/no_rejections.json ^"
     return 1
   fi
   _echo "Found $files_not_rejected_count episodes that have not been imported that should have been. Importing now..."
 
-  error=$(jq '{name: "ManualImport", importMode:"move", files: [.[]]}' /tmp/no_rejections.json >/tmp/import-list.json)
+  error=$(jq '{name: "ManualImport", importMode:"move", files: [.[]]}' /tmp/no_rejections.json >/tmp/import_list.json)
+  if [ "$?" -ne 0 ]; then
+    head /tmp/no_rejections.json
+    _echo "^/tmp/no_rejections.json"
+    head /tmp/import_list.json
+    _echo "^/tmp/import_list.json"
+    _echo "We failed to filter rejections with above data (possibly truncated)^"
+    _echo "$error"
+    _echo "^jq output"
+    return 1
+  fi
   HTTP_CODE=$(
     curl -s --output /tmp/import_out.json --write-out "%{http_code}" -X POST \
       -H "x-api-key: ${API_KEY}" \
       -H "Content-Type: application/json" \
-      --max-time 1800 \
-      -d @/tmp/import-list.json http://${HOST}:${PORT}/api/v3/command
+      --max-time ${MAX_WAIT_TIME_FOR_HTTP_REQ_IN_SECONDS} \
+      -d @/tmp/import_list.json http://${HOST}:${PORT}/api/v3/command
   )
   if [ "$?" -ne 0 ] || [[ ${HTTP_CODE} -lt 200 || ${HTTP_CODE} -gt 299 ]]; then
-    cat /tmp/no_rejections.json
-    cat /tmp/import_out.json
+    head /tmp/no_rejections.json
+    _echo "^/tmp/no_rejections.json"
+    head /tmp/import_out.json
+    _echo "^/tmp/import_out.json"
     _echo "$PROGRAM_NAME rejected our import request with a HTTP $HTTP_CODE with above data and response ^"
-    _echo "We're going to wait for a minute and then try again"
-    sleep 60
-    go()
-    return $?
+    return 1
   fi
 
   _echo "Sent manual import request to $PROGRAM_NAME."
