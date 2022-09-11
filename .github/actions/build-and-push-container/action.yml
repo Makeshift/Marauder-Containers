@@ -83,6 +83,7 @@ runs:
       id: architectures
       shell: bash
       run: |
+        set +e # don't fail the whole build just because a pipeline fails ugh
         curl -sL https://github.com/regclient/regclient/releases/latest/download/regctl-linux-amd64 >regctl
         chmod 755 regctl
         DOCKER_FROM=$(grep -i "^FROM" ${{ steps.dockerfile.outputs.result }} | head -n 1 | awk '{print $2}')
@@ -91,6 +92,7 @@ runs:
           echo "No architectures found in FROM manifest, defaulting to amd64"
           ARCHITECTURES="amd64"
         fi
+        echo "Target architectures for image $DOCKER_FROM set to: $ARCHITECTURES"
         echo "::set-output name=architectures::$ARCHITECTURES"
 
     - name: Build and push Docker image
