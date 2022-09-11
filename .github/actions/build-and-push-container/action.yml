@@ -68,9 +68,30 @@ runs:
           # set latest tag for master branch
           type=raw,value=latest,enable=${{ github.ref_name == inputs.latest_tag_branch }}
 
+    - name: Set up QEMU (${{ env.image_name }}/${{ matrix.architecture.slashed }})
+      id: qemu
+      uses: docker/setup-qemu-action@v1.2.0
+      with:
+        image: tonistiigi/binfmt:latest
+        platforms: all
+
     - name: Set up Docker Buildx
       id: buildx
       uses: docker/setup-buildx-action@v2
+
+    - name: Get list of architectures from source Dockerfile
+      id: architectures
+      shell: bash
+      run: |
+        curl -sL https://github.com/regclient/regclient/releases/latest/download/regctl-linux-amd64 >regctl
+        chmod 755 regctl
+        DOCKER_FROM=$(grep -i "^FROM" ${{ steps.dockerfile.outputs.result }} | head -n 1 | awk '{print $2}')
+        ARCHITECTURES=$(./regctl manifest get $DOCKER_FROM | /bin/grep -i "Platform:" | awk '{print $2}' | paste -s -d, -)
+        if [ $? != 0 ] || [ -z "$ARCHITECTURES" ]; then
+          echo "No architectures found in FROM manifest, defaulting to amd64"
+          ARCHITECTURES="amd64"
+        fi
+        echo "::set-output name=architectures::$ARCHITECTURES"
 
     - name: Build and push Docker image
       uses: docker/build-push-action@v2.7.0
@@ -82,6 +103,7 @@ runs:
         tags: ${{ steps.docker-manifest.outputs.tags }}
         labels: ${{ steps.docker-manifest.outputs.labels }}
         builder: ${{ steps.buildx.outputs.name }}
+        platforms: ${{ steps.architectures.outputs.architectures }}
         cache-from: type=gha
         cache-to: type=gha,mode=max
 
