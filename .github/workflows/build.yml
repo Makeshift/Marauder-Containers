@@ -1,9 +1,9 @@
 name: Build containers
 
-on: 
+on:
   push:
   schedule:
-    - cron: '0 0 * * 0'
+    - cron: "0 0 * * 0"
 
 jobs:
   cancel_redundant:
@@ -19,48 +19,62 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        group: 
+        group:
           - image: "makeshift27015/bazarr"
             dockerfile: "bazarr.Dockerfile"
+            readme_location: "generic-docker-readme.md"
 
           - image: "makeshift27015/marauder_gcloud_init"
             dockerfile: "gcloud_init/Dockerfile"
+            readme_location: "gcloud_init/Readme.md"
 
           - image: "makeshift27015/radarr"
             dockerfile: "radarr/Dockerfile"
+            readme_location: "radarr/Readme.md"
 
           - image: "makeshift27015/rclone"
             dockerfile: "rclone/Dockerfile"
+            readme_location: "rclone/Readme.md"
 
           - image: "makeshift27015/marauder_rclone_generate_keys"
             dockerfile: "rclone_generate_keys/Dockerfile"
+            readme_location: "rclone_generate_keys/Readme.md"
 
           - image: "makeshift27015/sonarr"
             dockerfile: "sonarr/Dockerfile"
+            readme_location: "sonarr/Readme.md"
 
           - image: "makeshift27015/traktarr"
             dockerfile: "traktarr/Dockerfile"
-          
+            readme_location: "traktarr/Readme.md"
+
           - image: "makeshift27015/headphones"
             dockerfile: "headphones.Dockerfile"
-          
+            readme_location: "generic-docker-readme.md"
+
           - image: "makeshift27015/lazylibrarian"
             dockerfile: "lazylibrarian.Dockerfile"
-          
+            readme_location: "generic-docker-readme.md"
+
           - image: "makeshift27015/medusa"
             dockerfile: "medusa.Dockerfile"
-          
+            readme_location: "generic-docker-readme.md"
+
           - image: "makeshift27015/mylar"
             dockerfile: "mylar.Dockerfile"
-          
+            readme_location: "generic-docker-readme.md"
+
           - image: "makeshift27015/nzbhydra2"
             dockerfile: "nzbhydra2.Dockerfile"
-          
+            readme_location: "generic-docker-readme.md"
+
           - image: "makeshift27015/sabnzbd"
             dockerfile: "sabnzbd.Dockerfile"
-          
+            readme_location: "generic-docker-readme.md"
+
           - image: "makeshift27015/transmission"
             dockerfile: "transmission.Dockerfile"
+            readme_location: "generic-docker-readme.md"
 
     steps:
       - name: Checkout
@@ -72,3 +86,4 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
           dockerfile: ${{ matrix.group.dockerfile }}
           image: ${{ matrix.group.image }}
+          readme_location: ${{ matrix.group.readme_location }}

@@ -1,3 +1,5 @@
+name: "Build and Push Container"
+description: "Build and push a Docker container to Docker Hub"
 inputs:
   username:
     description: Docker Hub username
@@ -8,6 +10,18 @@ inputs:
   dockerfile:
     description: Path to dockerfile
     default: inputs.context/Dockerfile
+  update_readme:
+    description: Update Readme on Docker Hub with the image
+    required: false
+    default: "true"
+  readme_location:
+    description: Path to the Readme file
+    required: false
+    default: inputs.context/Readme.md
+  dockerhub_short_description:
+    description: If update_readme is true, use this as the short description on Docker Hub, defaults to the repository description
+    required: false
+    default: REPO_DESC
   context:
     description: Dockerfile context
     default: .
@@ -18,23 +32,46 @@ inputs:
     description: What branch should be labelled as the 'latest' tag?
     default: master
 
-
 runs:
   using: composite
   steps:
-    - name: Inject slug/short variables
-      uses: rlespinasse/github-slug-action@v3.x
     - name: Log in to Docker Hub
-      uses: docker/login-action@v1.10.0
+      uses: docker/login-action@v1.14.1
       with:
         username: ${{ inputs.username }}
         password: ${{ inputs.password }}
 
-    - uses: bluwy/substitute-string-action@v1
+    - uses: bluwy/substitute-string-action@v2
       id: dockerfile
       with:
         _input-text: ${{ inputs.dockerfile }}
-        "inputs.context": ${{ inputs.context }}
+      env:
+        [inputs.context]: ${{ inputs.context }}
+
+    - uses: bluwy/substitute-string-action@v2
+      id: readme_location
+      with:
+        _input-text: ${{ inputs.readme_location }}
+      env:
+        [inputs.context]: ${{ inputs.context }}
+
+    - name: Docker meta for manifest (${{ inputs.image }})
+      id: docker-manifest
+      uses: docker/metadata-action@v3.7.0
+      with:
+        images: ${{ inputs.image }}
+        tags: |
+          type=schedule
+          type=ref,event=branch
+          type=ref,event=tag
+          type=ref,event=pr
+          type=sha,prefix=
+          # set latest tag for master branch
+          type=raw,value=latest,enable=${{ github.ref_name == inputs.latest_tag_branch }}
+
+    - name: Set up Docker Buildx
+      id: buildx
+      uses: docker/setup-buildx-action@v2
 
     - name: Build and push Docker image
       uses: docker/build-push-action@v2.7.0
@@ -42,5 +79,36 @@ runs:
         context: ${{ inputs.context }}
         file: ${{ steps.dockerfile.outputs.result }}
         push: true
-        tags: "${{ inputs.image }}:${{ env.GITHUB_REF_SLUG_URL == inputs.latest_tag_branch && 'latest' || env.GITHUB_REF_SLUG_URL }},${{ inputs.image }}:${{ env.GITHUB_SHA_SHORT }}"
-        cache-from: "${{ inputs.image }}:${{ env.GITHUB_REF_SLUG_URL == inputs.latest_tag_branch && 'latest' || env.GITHUB_REF_SLUG_URL }}"
+        pull: true
+        tags: ${{ steps.docker-manifest.outputs.tags }}
+        labels: ${{ steps.docker-manifest.outputs.labels }}
+        builder: ${{ steps.buildx.outputs.name }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+    - name: "Repository Meta"
+      uses: varunsridharan/action-repository-meta@main
+      id: repo-meta
+      if: success() && inputs.update_readme == 'true' && inputs.dockerhub_short_description == 'REPO_DESC' && github.ref_name == inputs.latest_tag_branch
+
+    # there must be a better way of doing this and I'm just being stupid, right?
+    - run: |
+        if [[ "${{inputs.update_readme == 'true' && inputs.dockerhub_short_description == 'REPO_DESC'}}" == "true" ]]; then
+          echo "REPO_DESC=${{ steps.repo-meta.outputs.REPOSITORY_DESCRIPTION }}"
+        else
+          echo "REPO_DESC=${{ inputs.dockerhub_short_description }}"
+        fi
+        echo "::set-output name=REPO_DESC::${REPO_DESC}"
+      shell: bash
+      if: success() && inputs.update_readme == 'true' && github.ref_name == inputs.latest_tag_branch
+      id: repo-desc
+
+    - name: Update DockerHub Repo Description (${{ inputs.image }})
+      if: success() && inputs.update_readme == 'true' && github.ref_name == inputs.latest_tag_branch
+      uses: peter-evans/dockerhub-description@v2
+      with:
+        username: ${{ inputs.username }}
+        password: ${{ inputs.password }}
+        repository: ${{ inputs.image }}
+        readme-filepath: ${{ steps.readme_location.outputs.result }}
+        short-description: ${{ steps.repo-desc.outputs.REPO_DESC }}

@@ -1,0 +1,44 @@
+version: 2
+
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "daily"
+
+  # Automatically covers all Dockerfiles in the main dir as per https://github.com/dependabot/feedback/issues/145
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "daily"
+
+  # All the rest in their own folders
+  - package-ecosystem: "docker"
+    directory: "rclone_generate_keys/"
+    schedule:
+      interval: "daily"
+
+  - package-ecosystem: "docker"
+    directory: "gcloud_init/"
+    schedule:
+      interval: "daily"
+
+  - package-ecosystem: "docker"
+    directory: "rclone/"
+    schedule:
+      interval: "daily"
+
+  - package-ecosystem: "docker"
+    directory: "traktarr/"
+    schedule:
+      interval: "daily"
+
+  - package-ecosystem: "docker"
+    directory: "radarr/"
+    schedule:
+      interval: "daily"
+
+  - package-ecosystem: "docker"
+    directory: "sonarr/"
+    schedule:
+      interval: "daily"
