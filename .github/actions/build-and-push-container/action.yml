@@ -86,9 +86,11 @@ runs:
         cache-to: type=gha,mode=max
 
     - name: "Repository Meta"
-      uses: varunsridharan/action-repository-meta@main
+      uses: varunsridharan/action-repository-meta@2
       id: repo-meta
       if: success() && inputs.update_readme == 'true' && inputs.dockerhub_short_description == 'REPO_DESC' && github.ref_name == inputs.latest_tag_branch
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
 
     # there must be a better way of doing this and I'm just being stupid, right?
     - run: |
