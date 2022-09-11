@@ -23,7 +23,6 @@ jobs:
         group:
           - image: "makeshift27015/bazarr"
             dockerfile: "bazarr.Dockerfile"
-            readme_location: "generic-docker-readme.md"
 
           - image: "makeshift27015/marauder_gcloud_init"
             dockerfile: "gcloud_init/Dockerfile"
@@ -53,31 +52,24 @@ jobs:
 
           - image: "makeshift27015/headphones"
             dockerfile: "headphones.Dockerfile"
-            readme_location: "generic-docker-readme.md"
 
           - image: "makeshift27015/lazylibrarian"
             dockerfile: "lazylibrarian.Dockerfile"
-            readme_location: "generic-docker-readme.md"
 
           - image: "makeshift27015/medusa"
             dockerfile: "medusa.Dockerfile"
-            readme_location: "generic-docker-readme.md"
 
           - image: "makeshift27015/mylar"
             dockerfile: "mylar.Dockerfile"
-            readme_location: "generic-docker-readme.md"
 
           - image: "makeshift27015/nzbhydra2"
             dockerfile: "nzbhydra2.Dockerfile"
-            readme_location: "generic-docker-readme.md"
 
           - image: "makeshift27015/sabnzbd"
             dockerfile: "sabnzbd.Dockerfile"
-            readme_location: "generic-docker-readme.md"
 
           - image: "makeshift27015/transmission"
             dockerfile: "transmission.Dockerfile"
-            readme_location: "generic-docker-readme.md"
 
     steps:
       - name: Checkout
@@ -89,4 +81,7 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
           dockerfile: ${{ matrix.group.dockerfile }}
           image: ${{ matrix.group.image }}
-          readme_location: ${{ matrix.group.readme_location }}
+          # If readme_location is set, use it, otherwise use the default
+          readme_location: ${{ matrix.group.readme_location != '' && matrix.group.readme_location || 'generic-docker-readme.md' }}
+          # If it's not empty, use it, otherwise set to 'DOCKERFILE' which means the action decides
+          architectures: ${{ matrix.group.architectures != '' && matrix.group.architectures || 'DOCKERFILE' }}
