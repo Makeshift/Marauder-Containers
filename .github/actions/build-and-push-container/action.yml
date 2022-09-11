@@ -86,7 +86,7 @@ runs:
         cache-to: type=gha,mode=max
 
     - name: "Repository Meta"
-      uses: varunsridharan/action-repository-meta@2
+      uses: varunsridharan/action-repository-meta@2.0
       id: repo-meta
       if: success() && inputs.update_readme == 'true' && inputs.dockerhub_short_description == 'REPO_DESC' && github.ref_name == inputs.latest_tag_branch
       env:
