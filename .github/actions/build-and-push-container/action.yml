@@ -28,6 +28,9 @@ inputs:
   latest_tag_branch:
     description: What branch should be labelled as the 'latest' tag?
     default: master
+  architectures:
+    description: Comma separated list of architectures to build for. Default will be gathered from the last FROM statement in the Dockerfile, or amd64 if none is found.
+    default: DOCKERFILE
 
 runs:
   using: composite
@@ -84,13 +87,17 @@ runs:
       shell: bash
       run: |
         set +e # don't fail the whole build just because a pipeline fails ugh
-        curl -sL https://github.com/regclient/regclient/releases/latest/download/regctl-linux-amd64 >regctl
-        chmod 755 regctl
-        DOCKER_FROM=$(grep -i "^FROM" ${{ steps.dockerfile.outputs.result }} | head -n 1 | awk '{print $2}')
-        ARCHITECTURES=$(./regctl manifest get $DOCKER_FROM | /bin/grep -i "Platform:" | awk '{print $2}' | paste -s -d, -)
-        if [ $? != 0 ] || [ -z "$ARCHITECTURES" ]; then
-          echo "No architectures found in FROM manifest, defaulting to amd64"
-          ARCHITECTURES="amd64"
+        if [[ "${{ inputs.architectures }}" =~ "DOCKERFILE" ]]; then
+          curl -sL https://github.com/regclient/regclient/releases/latest/download/regctl-linux-amd64 >regctl
+          chmod 755 regctl
+          DOCKER_FROM=$(grep -i "^FROM" ${{ steps.dockerfile.outputs.result }} | tail -n 1 | awk '{print $2}')
+          ARCHITECTURES=$(./regctl manifest get $DOCKER_FROM | /bin/grep -i "Platform:" | awk '{print $2}' | paste -s -d, -)
+          if [ $? != 0 ] || [ -z "$ARCHITECTURES" ]; then
+            echo "No architectures found in FROM manifest, defaulting to amd64"
+            ARCHITECTURES="amd64"
+          fi
+        else
+          ARCHITECTURES="${{ inputs.architectures }}"
         fi
         echo "Target architectures for image $DOCKER_FROM set to: $ARCHITECTURES"
         echo "::set-output name=architectures::$ARCHITECTURES"

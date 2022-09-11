@@ -36,6 +36,8 @@ jobs:
           - image: "makeshift27015/rclone"
             dockerfile: "rclone/Dockerfile"
             readme_location: "rclone/Readme.md"
+            # Sadly Rclone only builds for certain arch's, and I'm too lazy to build it in the container cos it takes ages
+            architectures: "linux/amd64,linux/arm/v6,linux/arm/v7,linux/arm64,linux/386"
 
           - image: "makeshift27015/marauder_rclone_generate_keys"
             dockerfile: "rclone_generate_keys/Dockerfile"
