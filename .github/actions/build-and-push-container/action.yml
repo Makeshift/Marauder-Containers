@@ -12,15 +12,12 @@ inputs:
     default: inputs.context/Dockerfile
   update_readme:
     description: Update Readme on Docker Hub with the image
-    required: false
     default: "true"
   readme_location:
     description: Path to the Readme file
-    required: false
     default: inputs.context/Readme.md
   dockerhub_short_description:
     description: If update_readme is true, use this as the short description on Docker Hub, defaults to the repository description
-    required: false
     default: REPO_DESC
   context:
     description: Dockerfile context
@@ -41,19 +38,21 @@ runs:
         username: ${{ inputs.username }}
         password: ${{ inputs.password }}
 
-    - uses: bluwy/substitute-string-action@v2
+    - name: Fix inputs.Dockerfile
+      uses: bluwy/substitute-string-action@v2
       id: dockerfile
       with:
         _input-text: ${{ inputs.dockerfile }}
       env:
-        [inputs.context]: ${{ inputs.context }}
+        "inputs.context": ${{ inputs.context }}
 
-    - uses: bluwy/substitute-string-action@v2
+    - name: Fix inputs.Readme_location
+      uses: bluwy/substitute-string-action@v2
       id: readme_location
       with:
         _input-text: ${{ inputs.readme_location }}
       env:
-        [inputs.context]: ${{ inputs.context }}
+        "inputs.context": ${{ inputs.context }}
 
     - name: Docker meta for manifest (${{ inputs.image }})
       id: docker-manifest
